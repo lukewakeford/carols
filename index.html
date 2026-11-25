@@ -187,7 +187,24 @@
 
   <!-- Main Content Container -->
   <main id="mainContent" class="mx-auto max-w-6xl px-3 pt-3.5 sm:px-5">
-    <div id="trackerControls" class="mb-3 flex flex-wrap items-start gap-3"></div>
+    <div id="trackerControls" class="mb-3 flex flex-wrap items-start gap-3">
+      <div id="midiSetup" class="control-panel hidden">
+        <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">MIDI device</div>
+        <p class="mb-3 text-sm text-muted-custom">Connect your BLE adapter in MIDIWeb/iPadOS first.</p>
+        <div class="flex flex-wrap items-end gap-3">
+          <button type="button" onclick="connectMidi()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Connect MIDI</button>
+          <label class="text-sm font-semibold">Output
+            <select id="midiOutput" onchange="selectMidiOutput(this.value)" class="block min-h-[44px] rounded-xl border px-3 surface-subtle">
+              <option value="">Select output</option>
+            </select>
+          </label>
+          <label class="text-sm font-semibold">Channel
+            <input id="midiChannel" type="number" min="1" max="16" value="1" onchange="saveMidiChannel(this)" class="block min-h-[44px] w-20 rounded-xl border px-3 surface-subtle" />
+          </label>
+        </div>
+        <p class="midi-status mt-2 text-sm text-muted-custom" role="status">MIDI not connected.</p>
+      </div>
+    </div>
     <!-- VIEW 1: SETLIST & PRACTICE TRACKER -->
     <section id="trackerView" class="space-y-3">
       <!-- Setlist Tracker Table (#1-#10 fixed in column 1) -->
@@ -256,41 +273,27 @@
         </div>
       </div>
         <div id="midiDrawer" class="control-panel hidden w-full">
-          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">MIDI</div>
-          <p class="mb-3 text-sm text-muted-custom">Connect your BLE MIDI adapter in MIDIWeb/iPadOS first. Select its output, then configure each song. Messages send when opening or changing songs.</p>
-          <div class="flex flex-wrap items-end gap-3">
-            <button type="button" onclick="connectMidi()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Connect MIDI</button>
-            <label class="text-sm font-semibold">Output
-              <select id="midiOutput" onchange="selectMidiOutput(this.value)" class="block min-h-[44px] rounded-xl border px-3 surface-subtle">
-                <option value="">Select output</option>
-              </select>
-            </label>
-            <label class="text-sm font-semibold">Channel
-              <input id="midiChannel" type="number" min="1" max="16" value="1" class="block min-h-[44px] w-20 rounded-xl border px-3 surface-subtle" />
-            </label>
-          </div>
-          <form id="midiSongForm" class="mt-4" onsubmit="saveMidiSettings(event)">
-            <div class="mb-2 text-sm font-bold">Settings for <span id="midiSongTitle"></span></div>
+          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">Song MIDI</div>
+          <form id="midiSongForm" onsubmit="saveMidiSettings(event)">
             <div class="flex flex-wrap items-end gap-3">
-              <label class="text-sm font-semibold">Program change (0–127, optional)
+              <label class="text-sm font-semibold">BPM
+                <input id="midiBpm" type="number" min="1" max="511" required onchange="updateSongBpm(selectedCallSheetId, this)" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
+              </label>
+              <label class="text-sm font-semibold">PC
                 <input id="midiProgram" type="number" min="0" max="127" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
               </label>
-              <label class="text-sm font-semibold">CC number (0–127, optional)
+              <label class="text-sm font-semibold">CC
                 <input id="midiCC" type="number" min="0" max="127" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
               </label>
-              <label class="text-sm font-semibold">CC value (0–127)
+              <label class="text-sm font-semibold">Value
                 <input id="midiCCValue" type="number" min="0" max="127" placeholder="Value" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
               </label>
-              <label class="text-sm font-semibold">BPM (optional)
-                <input id="midiBpm" type="number" min="1" max="511" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
-              </label>
-              <button type="button" onclick="document.getElementById('midiBpm').value = state.songs.find(s => s.id === selectedCallSheetId).bpm" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Use song BPM</button>
-              <button type="submit" class="min-h-[44px] rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white">Save MIDI settings</button>
+              <button type="submit" class="min-h-[44px] rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white">Save</button>
               <button type="button" onclick="sendCurrentSongMidi()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Send now</button>
             </div>
-            <p class="mt-2 text-sm text-muted-custom">Save before changing songs or sending. BPM sends Morningstar CC 5 (high bits), then CC 6 (low bits), on the selected channel. Numbers are raw MIDI values.</p>
+            <p class="mt-2 text-sm text-muted-custom">BPM saves automatically. Save PC/CC before sending. Device setup is on the setlist.</p>
           </form>
-          <p id="midiStatus" role="status" class="mt-2 text-sm text-muted-custom">MIDI not connected.</p>
+          <p class="midi-status mt-2 text-sm text-muted-custom" role="status">MIDI not connected.</p>
         </div>
       </div>
 
@@ -662,6 +665,10 @@
           return {
             ...def,
             key: typeof saved?.key === "string" && /^[A-G][#b]?$/.test(saved.key) ? saved.key : def.key,
+            bpm: Number.isInteger(saved?.bpm) && saved.bpm >= 1 && saved.bpm <= 511
+              ? saved.bpm
+              : Number.isInteger(saved?.midi?.bpm) && saved.midi.bpm >= 1 && saved.midi.bpm <= 511
+                ? saved.midi.bpm : def.bpm,
             midi: saved?.midi || null,
             status: saved?.status || def.status,
             notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
@@ -696,6 +703,7 @@
         const slim = state.songs.map((s) => ({
           id: s.id,
           key: s.key,
+          bpm: s.bpm,
           midi: s.midi,
           status: s.status,
           notes: s.notes,
@@ -963,6 +971,9 @@
         `
         : `
           <div class="flex shrink-0 items-center gap-1.5">
+            <button type="button" onclick="toggleMidiSetup()" class="${btnBaseClass} hover:border-sky-500" title="MIDI device setup" aria-label="MIDI device setup" aria-controls="midiSetup" aria-expanded="${!document.getElementById("midiSetup").classList.contains("hidden")}">
+              ${headerIcon("midi")}
+            </button>
             <a
               href="${escapeHtml(SPOTIFY_PLAYLIST_URL)}"
               target="_blank"
@@ -1007,6 +1018,7 @@
       if (slot) {
         slot.innerHTML = buildSharedHeaderBar("tracker");
       }
+      document.getElementById("midiChannel").value = state.midiChannel || 1;
     }
 
     function escapeHtml(value) {
@@ -1107,6 +1119,25 @@
       if (saved) showToast(`Key changed to ${key}; call sheet transposed and saved.`);
     }
 
+    function updateSongBpm(id, input) {
+      const song = state.songs.find((s) => s.id === id);
+      if (!input.reportValidity() || input.value === "") {
+        input.value = song.bpm;
+        showToast("Enter a whole BPM from 1 to 511.");
+        return;
+      }
+      const previous = song.bpm;
+      song.bpm = Number(input.value);
+      if (!saveState()) {
+        song.bpm = previous;
+        input.value = previous;
+        return;
+      }
+      document.getElementById("midiBpm").value = state.songs.find((s) => s.id === selectedCallSheetId).bpm;
+      renderTrackerTable();
+      sendSongMidi(song, true);
+    }
+
     function updateSongStatus(id, newStatus) {
       const target = state.songs.find((s) => s.id === id);
       if (!target) return;
@@ -1142,10 +1173,6 @@
 
       tbody.innerHTML = rows
         .map((song) => {
-          const tempoDisplay = song.secondaryBpm
-            ? `${song.bpm} / ${song.secondaryBpm} BPM`
-            : `${song.bpm} BPM`;
-
           return `
             <tr class="align-top transition hover:bg-sky-500/[0.03]">
               <!-- Fixed Setlist Order Number (#1-#10) -->
@@ -1187,7 +1214,13 @@
 
               <!-- Tempo / Meter -->
               <td class="px-3 py-3.5 whitespace-nowrap">
-                <div class="font-mono-chord text-xs font-bold">${escapeHtml(tempoDisplay)}</div>
+                <label class="inline-flex items-center gap-1 font-mono-chord text-sm font-bold">
+                  <input type="number" min="1" max="511" required value="${song.bpm}"
+                    aria-label="BPM for ${escapeHtml(song.title)}"
+                    onchange="updateSongBpm(${song.id}, this)"
+                    class="min-h-[44px] w-20 rounded-lg border px-2 text-base surface-subtle" /> BPM
+                </label>
+                ${song.secondaryBpm ? `<div class="text-xs text-muted-custom">Alternate: ${song.secondaryBpm} BPM</div>` : ""}
                 <div class="mt-0.5 text-xs text-muted-custom">${escapeHtml(song.meter)}</div>
                 <button
                   type="button"
@@ -1320,7 +1353,31 @@
     }
 
     function setMidiStatus(message) {
-      document.getElementById("midiStatus").textContent = message;
+      document.querySelectorAll(".midi-status").forEach((status) => {
+        status.textContent = message;
+      });
+    }
+
+    function toggleMidiSetup() {
+      document.getElementById("midiSetup").classList.toggle("hidden");
+      renderTrackerHeader();
+    }
+
+    function saveMidiChannel(input) {
+      if (!input.reportValidity() || input.value === "") {
+        input.value = state.midiChannel || 1;
+        setMidiStatus("Enter a MIDI channel from 1 to 16.");
+        return;
+      }
+      const previous = state.midiChannel;
+      state.midiChannel = Number(input.value);
+      if (!saveState()) {
+        state.midiChannel = previous;
+        input.value = previous || 1;
+        setMidiStatus("MIDI channel not saved.");
+      } else {
+        setMidiStatus(`MIDI channel ${state.midiChannel} saved.`);
+      }
     }
 
     function refreshMidiOutputs() {
@@ -1362,12 +1419,10 @@
 
     function updateMidiForm(song) {
       const config = song.midi || {};
-      document.getElementById("midiSongTitle").textContent = song.title;
-      document.getElementById("midiChannel").value = state.midiChannel || 1;
       document.getElementById("midiProgram").value = config.program ?? "";
       document.getElementById("midiCC").value = config.cc ?? "";
       document.getElementById("midiCCValue").value = config.ccValue ?? "";
-      document.getElementById("midiBpm").value = config.bpm ?? "";
+      document.getElementById("midiBpm").value = song.bpm;
     }
 
     function saveMidiSettings(event) {
@@ -1378,16 +1433,10 @@
         const value = document.getElementById(id).value;
         return value === "" ? null : Number(value);
       };
-      const channelInput = document.getElementById("midiChannel");
-      if (!channelInput.reportValidity() || channelInput.value === "") {
-        setMidiStatus("Enter a MIDI channel from 1 to 16.");
-        return;
-      }
       const config = {
         program: optionalNumber("midiProgram"),
         cc: optionalNumber("midiCC"),
-        ccValue: optionalNumber("midiCCValue"),
-        bpm: optionalNumber("midiBpm")
+        ccValue: optionalNumber("midiCCValue")
       };
       if ((config.cc === null) !== (config.ccValue === null)) {
         setMidiStatus("Enter both a CC number and value, or leave both blank.");
@@ -1395,25 +1444,22 @@
       }
       const song = state.songs.find((s) => s.id === selectedCallSheetId);
       const previousMidi = song.midi;
-      const previousChannel = state.midiChannel;
       song.midi = config;
-      state.midiChannel = Number(channelInput.value);
       if (saveState()) {
         setMidiStatus("MIDI settings saved on this device. Choose a song or use Send now.");
       } else {
         song.midi = previousMidi;
-        state.midiChannel = previousChannel;
         setMidiStatus("MIDI settings not saved. Keep this page open and try again.");
       }
     }
 
     function sendCurrentSongMidi() {
       const song = state.songs.find((s) => s.id === selectedCallSheetId);
-      const config = song.midi;
-      if (!config || (config.program == null && config.cc == null && config.bpm == null)) {
-        setMidiStatus(`No MIDI messages configured for ${song.title}.`);
-        return;
-      }
+      sendSongMidi(song);
+    }
+
+    function sendSongMidi(song, tempoOnly = false) {
+      const config = song.midi || {};
       const output = midiAccess?.outputs.get(midiOutputId);
       if (!output || output.state !== "connected") {
         const message = `MIDI not sent for ${song.title}: connect and select an output.`;
@@ -1423,12 +1469,10 @@
       }
       try {
         const channel = (state.midiChannel || 1) - 1;
-        if (config.program != null) output.send([0xC0 | channel, config.program]);
-        if (config.cc != null) output.send([0xB0 | channel, config.cc, config.ccValue]);
-        if (config.bpm != null) {
-          output.send([0xB0 | channel, 5, Math.floor(config.bpm / 128)]);
-          output.send([0xB0 | channel, 6, config.bpm % 128]);
-        }
+        if (!tempoOnly && config.program != null) output.send([0xC0 | channel, config.program]);
+        if (!tempoOnly && config.cc != null) output.send([0xB0 | channel, config.cc, config.ccValue]);
+        output.send([0xB0 | channel, 5, Math.floor(song.bpm / 128)]);
+        output.send([0xB0 | channel, 6, song.bpm % 128]);
         setMidiStatus(`MIDI sent for ${song.title} to ${output.name || "selected output"}.`);
       } catch (error) {
         console.error("MIDI send failed:", error);
