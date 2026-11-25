@@ -549,6 +549,7 @@
       editingSongId = id;
       const song = id === null ? null : state.songs.find((item) => item.id === id);
       document.getElementById("songEditorTitle").textContent = song ? "Edit song" : "Add song";
+      document.getElementById("requestDeleteSongBtn").classList.toggle("hidden", !song);
       document.getElementById("songTitle").value = song?.title ?? "";
       document.getElementById("songSubtitle").value = song?.subtitle ?? "";
       document.getElementById("songRig").value = song?.rigNote ?? "";
@@ -730,7 +731,6 @@
                 </button>
                 <div class="flex flex-wrap gap-2">
                   <button type="button" onclick="editSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-muted-custom hover:text-sky-400">Edit</button>
-                  <button type="button" onclick="requestDeleteSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-rose-400">Delete</button>
                 </div>
               </td>
 
