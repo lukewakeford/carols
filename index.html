@@ -43,18 +43,35 @@
       padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
     }
 
+    html,
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      touch-action: manipulation;
+    }
+
+    @media (pointer: coarse) {
+      .app-header {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+      }
+    }
+
+    @media (pointer: coarse), (max-width: 640px) {
+      input:not([type="file"]),
+      select,
+      textarea {
+        font-size: 16px;
+      }
+    }
+
     @media (max-width: 640px) {
       .app-header button,
       .app-header a {
         min-height: 44px;
         padding-block: 0.625rem;
         padding-inline: 0.75rem;
-      }
-
-      input:not([type="file"]),
-      select,
-      textarea {
-        font-size: 16px;
       }
     }
 
