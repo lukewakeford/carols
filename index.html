@@ -204,6 +204,19 @@
         </div>
         <p class="midi-status mt-2 text-sm text-muted-custom" role="status">MIDI not connected.</p>
       </div>
+      <div id="dataPanel" class="control-panel hidden">
+        <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">Backup and restore</div>
+        <p class="mb-3 text-sm text-muted-custom">Export a backup from the old bookmark, then import it here. Import replaces this app's saved data. Export a backup here first if you need to keep it.</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="button" onclick="exportData()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Export backup</button>
+          <label class="inline-flex min-h-[44px] cursor-pointer items-center rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">
+            Choose backup
+            <input id="importFile" type="file" accept=".json,application/json" onchange="prepareImport(this)" class="sr-only" />
+          </label>
+          <button id="confirmImportBtn" type="button" onclick="importData()" class="hidden min-h-[44px] rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white">Replace saved data</button>
+        </div>
+        <p id="dataStatus" role="status" class="mt-2 text-sm text-muted-custom"></p>
+      </div>
     </div>
     <!-- VIEW 1: SETLIST & PRACTICE TRACKER -->
     <section id="trackerView" class="space-y-3">
@@ -650,6 +663,7 @@
     let midiAccess = null;
     let midiOutputId = "";
     let midiFormSongId = null;
+    let pendingImport = null;
 
     function loadState() {
       try {
@@ -732,6 +746,86 @@
       }, 2400);
     }
 
+    function toggleDataPanel() {
+      document.getElementById("dataPanel").classList.toggle("hidden");
+      renderTrackerHeader();
+    }
+
+    function exportData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const data = raw === null ? JSON.stringify(state, null, 2) : raw;
+        const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "carols-backup.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        document.getElementById("dataStatus").textContent = "Backup download started. Keep the file somewhere safe.";
+      } catch (error) {
+        console.error("Backup export failed:", error);
+        document.getElementById("dataStatus").textContent = `Export failed: ${error.message}`;
+      }
+    }
+
+    async function prepareImport(input) {
+      pendingImport = null;
+      const confirmButton = document.getElementById("confirmImportBtn");
+      const status = document.getElementById("dataStatus");
+      confirmButton.classList.add("hidden");
+      const file = input.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 10 * 1024 * 1024) throw new Error("Backup exceeds 10 MB.");
+        const raw = await file.text();
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.songs) || data.songs.length === 0) {
+          throw new Error("This is not a carols backup.");
+        }
+        const ids = new Set();
+        for (const song of data.songs) {
+          if (!song || !DEFAULT_SONGS.some((def) => def.id === song.id) || ids.has(song.id)) {
+            throw new Error("Backup contains unknown or duplicate songs.");
+          }
+          ids.add(song.id);
+          if (song.sections !== undefined && (!Array.isArray(song.sections) || !song.sections.every((section) =>
+            section && typeof section.chords === "string" &&
+            (section.name === undefined || typeof section.name === "string") &&
+            (section.timingHint === undefined || typeof section.timingHint === "string") &&
+            (section.patch === undefined || typeof section.patch === "string")
+          ))) {
+            throw new Error("Backup contains invalid sections.");
+          }
+          if (song.sections?.some((section) => section.name !== undefined) &&
+              !song.sections.every((section) => typeof section.name === "string")) {
+            throw new Error("Backup mixes old and new section formats.");
+          }
+        }
+        pendingImport = raw;
+        status.textContent = `Ready to import ${data.songs.length} songs from ${file.name}. This replaces saved data here.`;
+        confirmButton.classList.remove("hidden");
+      } catch (error) {
+        console.error("Backup import failed:", error);
+        status.textContent = `Cannot import: ${error.message}`;
+      } finally {
+        input.value = "";
+      }
+    }
+
+    function importData() {
+      if (pendingImport === null) return;
+      try {
+        localStorage.setItem(STORAGE_KEY, pendingImport);
+        pendingImport = null;
+        window.location.reload();
+      } catch (error) {
+        console.error("Backup restore failed:", error);
+        document.getElementById("dataStatus").textContent = `Import failed: ${error.message}`;
+      }
+    }
+
     // =========================================================================
     // 3. CHORD TRANSPOSITION ENGINE
     // =========================================================================
@@ -797,6 +891,7 @@
       callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
       fontSize: '<path d="m3 19 6-14 6 14M5 14h8M17 10h6M20 10v9"/>',
       midi: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v7m5-7v7m5-7v7M3 13h18"/>',
+      data: '<path d="M4 4h16v16H4zM8 4v5h8V4M8 20v-7h8v7"/>',
       cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
       refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9a7 7 0 0 1 11.6-2L20 12M4 12l2.9 5a7 7 0 0 0 11.6-2"/>',
@@ -971,6 +1066,9 @@
         `
         : `
           <div class="flex shrink-0 items-center gap-1.5">
+            <button type="button" onclick="toggleDataPanel()" class="${btnBaseClass} hover:border-sky-500" title="Backup and restore" aria-label="Backup and restore" aria-controls="dataPanel" aria-expanded="${!document.getElementById("dataPanel").classList.contains("hidden")}">
+              ${headerIcon("data")}
+            </button>
             <button type="button" onclick="toggleMidiSetup()" class="${btnBaseClass} hover:border-sky-500" title="MIDI device setup" aria-label="MIDI device setup" aria-controls="midiSetup" aria-expanded="${!document.getElementById("midiSetup").classList.contains("hidden")}">
               ${headerIcon("midi")}
             </button>
