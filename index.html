@@ -43,6 +43,26 @@
       padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
     }
 
+    .control-panel {
+      width: fit-content;
+      max-width: 100%;
+      border: 1px solid var(--border-subtle);
+      border-radius: 1rem;
+      padding: 0.75rem;
+      background-color: var(--bg-card);
+    }
+
+    #callSheetContainer .bar-grid,
+    #callSheetContainer .bar-note-text {
+      font-size: var(--call-sheet-font-size, 16px);
+    }
+
+    #callSheetContainer h3,
+    #callSheetContainer .section-patch,
+    #callSheetContainer .section-notes {
+      font-size: calc(var(--call-sheet-font-size, 16px) * 0.875);
+    }
+
     html,
     button,
     a,
@@ -167,6 +187,7 @@
 
   <!-- Main Content Container -->
   <main id="mainContent" class="mx-auto max-w-6xl px-3 pt-3.5 sm:px-5">
+    <div id="trackerControls" class="mb-3 flex flex-wrap items-start gap-3"></div>
     <!-- VIEW 1: SETLIST & PRACTICE TRACKER -->
     <section id="trackerView" class="space-y-3">
       <!-- Setlist Tracker Table (#1-#10 fixed in column 1) -->
@@ -224,8 +245,9 @@
     </header>
 
     <div class="mx-auto max-w-6xl space-y-3.5 px-3 sm:px-5">
+      <div id="callSheetControls" class="flex flex-wrap items-start gap-3">
       <!-- Collapsible Transpose Drawer -->
-      <div id="transposeDrawer" class="hidden rounded-2xl border p-3 surface-card">
+      <div id="transposeDrawer" class="control-panel hidden">
         <div class="mb-2 flex items-center justify-between gap-2">
           <span class="text-sm font-bold uppercase tracking-wider text-muted-custom">Transpose Chords</span>
           <span id="transposeReadout" class="font-mono-chord text-sm font-bold text-sky-600 dark:text-sky-400">
@@ -250,6 +272,16 @@
           </button>
         </div>
       </div>
+      <div id="fontSizeDrawer" class="control-panel hidden">
+        <label for="callSheetFontSize" class="mb-2 block text-sm font-bold uppercase tracking-wider text-muted-custom">Call-sheet text size</label>
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="button" onclick="setCallSheetFontSize((state.callSheetFontSize || 16) - 2)" aria-label="Decrease call-sheet text size" class="min-h-[44px] min-w-[44px] rounded-xl border p-2 text-base font-bold surface-subtle">A-</button>
+          <input id="callSheetFontSize" type="range" min="14" max="28" step="2" value="16" oninput="setCallSheetFontSize(Number(this.value))" class="min-h-[44px] w-32" />
+          <button type="button" onclick="setCallSheetFontSize((state.callSheetFontSize || 16) + 2)" aria-label="Increase call-sheet text size" class="min-h-[44px] min-w-[44px] rounded-xl border p-2 text-base font-bold surface-subtle">A+</button>
+          <output id="fontSizeReadout" for="callSheetFontSize" class="text-sm font-bold">16px</output>
+        </div>
+      </div>
+      </div>
 
       <!-- Active Call Sheet Card -->
       <div id="callSheetContainer">
@@ -258,9 +290,10 @@
     </div>
   </section>
 
-  <!-- Collapsible Metronome & Tap Tempo Drawer (positioned below active header) -->
-  <section id="metronomeDrawer" class="hidden border-b surface-card">
-    <div class="mx-auto max-w-6xl px-3 py-3 sm:px-5">
+  <!-- Shared metronome panel moves into the active view's inline controls. -->
+  <section id="metronomeDrawer" class="control-panel hidden">
+    <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">Metronome</div>
+    <div>
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-center gap-3">
           <button
@@ -310,14 +343,6 @@
         <div id="beatDots" class="flex items-center gap-2">
           <!-- Rendered dynamically -->
         </div>
-
-        <button
-          id="closeMetronomeBtn"
-          type="button"
-          class="rounded-lg px-2.5 py-1 text-xs font-semibold text-muted-custom hover:bg-slate-500/10"
-        >
-          Hide
-        </button>
       </div>
     </div>
   </section>
@@ -605,6 +630,7 @@
     let selectedCallSheetId = 1;
     let transposeSemitones = 0;
     let transposeDrawerOpen = false;
+    let fontSizeDrawerOpen = false;
     let showPhraseCues = true;
     let songPickerOpen = false;
     let editingCallSheetSection = null;
@@ -626,7 +652,8 @@
             notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
             sections: Array.isArray(saved?.sections) && saved.sections.every((section) =>
               typeof section?.name === "string" && typeof section.chords === "string" &&
-              (section.timingHint === undefined || typeof section.timingHint === "string")
+              (section.timingHint === undefined || typeof section.timingHint === "string") &&
+              (section.patch === undefined || typeof section.patch === "string")
             ) ? saved.sections : def.sections.map((section, index) => ({
               ...section,
               chords: typeof saved?.sections?.[index]?.chords === "string"
@@ -635,7 +662,13 @@
             }))
           };
         });
-        return { songs: merged, stageMode: true };
+        return {
+          songs: merged,
+          stageMode: true,
+          callSheetFontSize: Number.isInteger(parsed.callSheetFontSize) &&
+            parsed.callSheetFontSize >= 14 && parsed.callSheetFontSize <= 28
+            ? parsed.callSheetFontSize : 16
+        };
       } catch (err) {
         console.error("Failed to load saved state:", err);
         return { songs: structuredClone(DEFAULT_SONGS), stageMode: true };
@@ -648,11 +681,11 @@
           id: s.id,
           status: s.status,
           notes: s.notes,
-          sections: s.sections.map(({ name, chords, timingHint }) => ({ name, chords, timingHint }))
+          sections: s.sections.map(({ name, chords, timingHint, patch }) => ({ name, chords, timingHint, patch }))
         }));
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ songs: slim, stageMode: true })
+          JSON.stringify({ songs: slim, stageMode: true, callSheetFontSize: state.callSheetFontSize || 16 })
         );
         return true;
       } catch (err) {
@@ -737,6 +770,7 @@
       setlist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
       callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
       transpose: '<path d="M8 20V4m-4 4 4-4 4 4M16 4v16m-4-4 4 4 4-4"/>',
+      fontSize: '<path d="m3 19 6-14 6 14M5 14h8M17 10h6M20 10v9"/>',
       cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
       refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9a7 7 0 0 1 11.6-2L20 12M4 12l2.9 5a7 7 0 0 0 11.6-2"/>',
@@ -813,6 +847,18 @@
             >
               ${headerIcon("transpose")}
               ${transposeSemitones === 0 ? "" : `<span class="text-xs">${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}</span>`}
+            </button>
+            <button
+              id="toggleFontSizeBtn"
+              type="button"
+              onclick="fontSizeDrawerOpen = !fontSizeDrawerOpen; renderCallSheetView()"
+              class="${btnBaseClass} hover:border-sky-500"
+              title="Text size"
+              aria-label="Call-sheet text size"
+              aria-expanded="${fontSizeDrawerOpen}"
+              aria-controls="fontSizeDrawer"
+            >
+              ${headerIcon("fontSize")}
             </button>
             <button
               id="togglePhraseCuesBtn"
@@ -1220,9 +1266,22 @@
       renderCallSheetView();
     }
 
+    function applyCallSheetFontSize() {
+      const size = state.callSheetFontSize || 16;
+      document.getElementById("callSheetContainer").style.setProperty("--call-sheet-font-size", `${size}px`);
+      document.getElementById("callSheetFontSize").value = size;
+      document.getElementById("fontSizeReadout").textContent = `${size}px`;
+    }
+
+    function setCallSheetFontSize(size) {
+      state.callSheetFontSize = Math.min(28, Math.max(14, size));
+      applyCallSheetFontSize();
+      saveState();
+    }
+
     function addCallSheetSection() {
       const song = state.songs.find((s) => s.id === selectedCallSheetId);
-      song.sections.push({ name: "New section", chords: "", timingHint: "" });
+      song.sections.push({ name: "New section", chords: "", timingHint: "", patch: "" });
       if (!saveState()) {
         song.sections.pop();
         return;
@@ -1257,6 +1316,8 @@
 
       const drawerEl = document.getElementById("transposeDrawer");
       drawerEl.classList.toggle("hidden", !transposeDrawerOpen);
+      document.getElementById("fontSizeDrawer").classList.toggle("hidden", !fontSizeDrawerOpen);
+      applyCallSheetFontSize();
 
       const shiftLabel =
         transposeSemitones === 0
@@ -1280,16 +1341,19 @@
           const renderedChords = transposeProgressionString(sec.chords, transposeSemitones, preferFlats);
           const hintHtml =
             showPhraseCues && sec.timingHint
-              ? `<div class="mt-1.5 whitespace-pre-wrap text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
+              ? `<div class="section-notes mt-1.5 whitespace-pre-wrap text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
                   sec.timingHint
                 )}</div>`
               : "";
           return `
             <div class="rounded-xl border p-3 surface-subtle">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                  ${escapeHtml(sec.name)}
-                </h3>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-sm font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                    ${escapeHtml(sec.name)}
+                  </h3>
+                  ${sec.patch ? `<div class="section-patch mt-1 break-words text-sm font-semibold text-muted-custom">Patch: ${escapeHtml(sec.patch)}</div>` : ""}
+                </div>
                 <button
                   type="button"
                   class="min-h-[44px] px-2 py-2 text-xs text-muted-custom hover:text-sky-400"
@@ -1305,6 +1369,15 @@
                     type="text"
                     value="${escapeHtml(sec.name)}"
                     oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, 'name', this.value)"
+                    class="mb-3 mt-2 w-full rounded-xl border p-3 text-base surface-card focus:border-sky-500 focus:outline-none"
+                  />
+                  <label for="sectionPatchEditor" class="block text-sm font-semibold">Guitar patch</label>
+                  <input
+                    id="sectionPatchEditor"
+                    type="text"
+                    value="${escapeHtml(sec.patch || "")}"
+                    placeholder="e.g. Clean + shimmer"
+                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, 'patch', this.value)"
                     class="mb-3 mt-2 w-full rounded-xl border p-3 text-base surface-card focus:border-sky-500 focus:outline-none"
                   />
                   <label for="sectionChordsEditor" class="block text-sm font-semibold">
@@ -1451,20 +1524,10 @@
 
     function toggleMetronomeDrawer() {
       const drawer = document.getElementById("metronomeDrawer");
-      const anchorHeader =
-        activeTab === "callSheets"
-          ? document.getElementById("callSheetHeaderBar")
-          : document.getElementById("mainHeader");
-      if (drawer && anchorHeader && anchorHeader.parentNode) {
-        anchorHeader.insertAdjacentElement("afterend", drawer);
-      }
       drawer.classList.toggle("hidden");
       renderBeatDots();
     }
 
-    document.getElementById("closeMetronomeBtn").addEventListener("click", () => {
-      document.getElementById("metronomeDrawer").classList.add("hidden");
-    });
     document.getElementById("metroPlayBtn").addEventListener("click", () => {
       if (metroPlaying) stopMetronome();
       else startMetronome();
@@ -1495,6 +1558,8 @@
     // In switchTab(tabName)
     function switchTab(tabName) {
       activeTab = tabName;
+      document.getElementById(tabName === "callSheets" ? "callSheetControls" : "trackerControls")
+        .appendChild(document.getElementById("metronomeDrawer"));
       syncHeaderVisibilityForTab(tabName);
       const mainContent = document.getElementById("mainContent");
       const trackerView = document.getElementById("trackerView");
