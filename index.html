@@ -254,6 +254,7 @@
           <button type="button" onclick="setCallSheetFontSize((state.callSheetFontSize || 16) + 2)" aria-label="Increase call-sheet text size" class="min-h-[44px] min-w-[44px] rounded-xl border p-2 text-base font-bold surface-subtle">A+</button>
           <output id="fontSizeReadout" for="callSheetFontSize" class="text-sm font-bold">16px</output>
         </div>
+      </div>
         <div id="midiDrawer" class="control-panel hidden w-full">
           <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">MIDI</div>
           <p class="mb-3 text-sm text-muted-custom">Connect your BLE MIDI adapter in MIDIWeb/iPadOS first. Select its output, then configure each song. Messages send when opening or changing songs.</p>
@@ -291,7 +292,6 @@
           </form>
           <p id="midiStatus" role="status" class="mt-2 text-sm text-muted-custom">MIDI not connected.</p>
         </div>
-      </div>
       </div>
 
       <!-- Active Call Sheet Card -->
