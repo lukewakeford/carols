@@ -254,6 +254,43 @@
           <button type="button" onclick="setCallSheetFontSize((state.callSheetFontSize || 16) + 2)" aria-label="Increase call-sheet text size" class="min-h-[44px] min-w-[44px] rounded-xl border p-2 text-base font-bold surface-subtle">A+</button>
           <output id="fontSizeReadout" for="callSheetFontSize" class="text-sm font-bold">16px</output>
         </div>
+        <div id="midiDrawer" class="control-panel hidden w-full">
+          <div class="mb-2 text-sm font-bold uppercase tracking-wider text-muted-custom">MIDI</div>
+          <p class="mb-3 text-sm text-muted-custom">Connect your BLE MIDI adapter in MIDIWeb/iPadOS first. Select its output, then configure each song. Messages send when opening or changing songs.</p>
+          <div class="flex flex-wrap items-end gap-3">
+            <button type="button" onclick="connectMidi()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Connect MIDI</button>
+            <label class="text-sm font-semibold">Output
+              <select id="midiOutput" onchange="selectMidiOutput(this.value)" class="block min-h-[44px] rounded-xl border px-3 surface-subtle">
+                <option value="">Select output</option>
+              </select>
+            </label>
+            <label class="text-sm font-semibold">Channel
+              <input id="midiChannel" type="number" min="1" max="16" value="1" class="block min-h-[44px] w-20 rounded-xl border px-3 surface-subtle" />
+            </label>
+          </div>
+          <form id="midiSongForm" class="mt-4" onsubmit="saveMidiSettings(event)">
+            <div class="mb-2 text-sm font-bold">Settings for <span id="midiSongTitle"></span></div>
+            <div class="flex flex-wrap items-end gap-3">
+              <label class="text-sm font-semibold">Program change (0–127, optional)
+                <input id="midiProgram" type="number" min="0" max="127" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
+              </label>
+              <label class="text-sm font-semibold">CC number (0–127, optional)
+                <input id="midiCC" type="number" min="0" max="127" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
+              </label>
+              <label class="text-sm font-semibold">CC value (0–127)
+                <input id="midiCCValue" type="number" min="0" max="127" placeholder="Value" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
+              </label>
+              <label class="text-sm font-semibold">BPM (optional)
+                <input id="midiBpm" type="number" min="1" max="511" placeholder="Off" class="block min-h-[44px] w-28 rounded-xl border px-3 surface-subtle" />
+              </label>
+              <button type="button" onclick="document.getElementById('midiBpm').value = state.songs.find(s => s.id === selectedCallSheetId).bpm" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Use song BPM</button>
+              <button type="submit" class="min-h-[44px] rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white">Save MIDI settings</button>
+              <button type="button" onclick="sendCurrentSongMidi()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Send now</button>
+            </div>
+            <p class="mt-2 text-sm text-muted-custom">Save before changing songs or sending. BPM sends Morningstar CC 5 (high bits), then CC 6 (low bits), on the selected channel. Numbers are raw MIDI values.</p>
+          </form>
+          <p id="midiStatus" role="status" class="mt-2 text-sm text-muted-custom">MIDI not connected.</p>
+        </div>
       </div>
       </div>
 
@@ -606,6 +643,10 @@
     let showPhraseCues = true;
     let songPickerOpen = false;
     let editingCallSheetSection = null;
+    let midiDrawerOpen = false;
+    let midiAccess = null;
+    let midiOutputId = "";
+    let midiFormSongId = null;
 
     function loadState() {
       try {
@@ -621,6 +662,7 @@
           return {
             ...def,
             key: typeof saved?.key === "string" && /^[A-G][#b]?$/.test(saved.key) ? saved.key : def.key,
+            midi: saved?.midi || null,
             status: saved?.status || def.status,
             notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
             sections: Array.isArray(saved?.sections) && saved.sections.every((section) =>
@@ -638,6 +680,7 @@
         return {
           songs: merged,
           stageMode: true,
+          midiChannel: Number.isInteger(parsed.midiChannel) && parsed.midiChannel >= 1 && parsed.midiChannel <= 16 ? parsed.midiChannel : 1,
           callSheetFontSize: Number.isInteger(parsed.callSheetFontSize) &&
             parsed.callSheetFontSize >= 14 && parsed.callSheetFontSize <= 28
             ? parsed.callSheetFontSize : 16
@@ -653,13 +696,14 @@
         const slim = state.songs.map((s) => ({
           id: s.id,
           key: s.key,
+          midi: s.midi,
           status: s.status,
           notes: s.notes,
           sections: s.sections.map(({ name, chords, timingHint, patch }) => ({ name, chords, timingHint, patch }))
         }));
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ songs: slim, stageMode: true, callSheetFontSize: state.callSheetFontSize || 16 })
+          JSON.stringify({ songs: slim, stageMode: true, midiChannel: state.midiChannel || 1, callSheetFontSize: state.callSheetFontSize || 16 })
         );
         return true;
       } catch (err) {
@@ -744,6 +788,7 @@
       setlist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
       callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
       fontSize: '<path d="m3 19 6-14 6 14M5 14h8M17 10h6M20 10v9"/>',
+      midi: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v7m5-7v7m5-7v7M3 13h18"/>',
       cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
       refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9a7 7 0 0 1 11.6-2L20 12M4 12l2.9 5a7 7 0 0 0 11.6-2"/>',
@@ -804,6 +849,15 @@
       const rightHtml = isCallSheet
         ? `
           <div class="relative flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
+            <button
+              type="button"
+              onclick="midiDrawerOpen = !midiDrawerOpen; renderCallSheetView()"
+              class="${btnBaseClass} hover:border-sky-500"
+              title="MIDI settings"
+              aria-label="MIDI settings"
+              aria-expanded="${midiDrawerOpen}"
+              aria-controls="midiDrawer"
+            >${headerIcon("midi")}</button>
             <button
               id="toggleFontSizeBtn"
               type="button"
@@ -1265,6 +1319,125 @@
       saveState();
     }
 
+    function setMidiStatus(message) {
+      document.getElementById("midiStatus").textContent = message;
+    }
+
+    function refreshMidiOutputs() {
+      const select = document.getElementById("midiOutput");
+      select.replaceChildren(new Option("Select output", ""));
+      for (const output of midiAccess.outputs.values()) {
+        if (output.state === "connected") {
+          select.add(new Option(output.name || "Unnamed MIDI output", output.id));
+        }
+      }
+      if (midiOutputId && midiAccess.outputs.get(midiOutputId)?.state !== "connected") {
+        midiOutputId = "";
+        setMidiStatus("MIDI output disconnected. Select an available output.");
+      }
+      select.value = midiOutputId;
+    }
+
+    async function connectMidi() {
+      if (!navigator.requestMIDIAccess) {
+        setMidiStatus("Web MIDI is unavailable in this browser. Open the site in MIDIWeb with MIDI access enabled.");
+        return;
+      }
+      try {
+        midiAccess = await navigator.requestMIDIAccess();
+        midiAccess.onstatechange = refreshMidiOutputs;
+        refreshMidiOutputs();
+        setMidiStatus("MIDI access enabled. Select an output; pair Bluetooth MIDI in MIDIWeb/iPadOS if it is not listed.");
+      } catch (error) {
+        console.error("MIDI access failed:", error);
+        setMidiStatus(`MIDI access failed: ${error.message}`);
+      }
+    }
+
+    function selectMidiOutput(id) {
+      midiOutputId = id;
+      const output = midiAccess?.outputs.get(id);
+      setMidiStatus(output ? `Selected: ${output.name || "MIDI output"}.` : "Select a MIDI output.");
+    }
+
+    function updateMidiForm(song) {
+      const config = song.midi || {};
+      document.getElementById("midiSongTitle").textContent = song.title;
+      document.getElementById("midiChannel").value = state.midiChannel || 1;
+      document.getElementById("midiProgram").value = config.program ?? "";
+      document.getElementById("midiCC").value = config.cc ?? "";
+      document.getElementById("midiCCValue").value = config.ccValue ?? "";
+      document.getElementById("midiBpm").value = config.bpm ?? "";
+    }
+
+    function saveMidiSettings(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity()) return;
+      const optionalNumber = (id) => {
+        const value = document.getElementById(id).value;
+        return value === "" ? null : Number(value);
+      };
+      const channelInput = document.getElementById("midiChannel");
+      if (!channelInput.reportValidity() || channelInput.value === "") {
+        setMidiStatus("Enter a MIDI channel from 1 to 16.");
+        return;
+      }
+      const config = {
+        program: optionalNumber("midiProgram"),
+        cc: optionalNumber("midiCC"),
+        ccValue: optionalNumber("midiCCValue"),
+        bpm: optionalNumber("midiBpm")
+      };
+      if ((config.cc === null) !== (config.ccValue === null)) {
+        setMidiStatus("Enter both a CC number and value, or leave both blank.");
+        return;
+      }
+      const song = state.songs.find((s) => s.id === selectedCallSheetId);
+      const previousMidi = song.midi;
+      const previousChannel = state.midiChannel;
+      song.midi = config;
+      state.midiChannel = Number(channelInput.value);
+      if (saveState()) {
+        setMidiStatus("MIDI settings saved on this device. Choose a song or use Send now.");
+      } else {
+        song.midi = previousMidi;
+        state.midiChannel = previousChannel;
+        setMidiStatus("MIDI settings not saved. Keep this page open and try again.");
+      }
+    }
+
+    function sendCurrentSongMidi() {
+      const song = state.songs.find((s) => s.id === selectedCallSheetId);
+      const config = song.midi;
+      if (!config || (config.program == null && config.cc == null && config.bpm == null)) {
+        setMidiStatus(`No MIDI messages configured for ${song.title}.`);
+        return;
+      }
+      const output = midiAccess?.outputs.get(midiOutputId);
+      if (!output || output.state !== "connected") {
+        const message = `MIDI not sent for ${song.title}: connect and select an output.`;
+        setMidiStatus(message);
+        showToast(message);
+        return;
+      }
+      try {
+        const channel = (state.midiChannel || 1) - 1;
+        if (config.program != null) output.send([0xC0 | channel, config.program]);
+        if (config.cc != null) output.send([0xB0 | channel, config.cc, config.ccValue]);
+        if (config.bpm != null) {
+          output.send([0xB0 | channel, 5, Math.floor(config.bpm / 128)]);
+          output.send([0xB0 | channel, 6, config.bpm % 128]);
+        }
+        setMidiStatus(`MIDI sent for ${song.title} to ${output.name || "selected output"}.`);
+      } catch (error) {
+        console.error("MIDI send failed:", error);
+        const message = `MIDI send failed for ${song.title}: ${error.message}`;
+        setMidiStatus(message);
+        showToast(message);
+      }
+    }
+
     function addCallSheetSection() {
       const song = state.songs.find((s) => s.id === selectedCallSheetId);
       song.sections.push({ name: "New section", chords: "", timingHint: "", patch: "" });
@@ -1298,6 +1471,11 @@
       }
 
       document.getElementById("fontSizeDrawer").classList.toggle("hidden", !fontSizeDrawerOpen);
+      document.getElementById("midiDrawer").classList.toggle("hidden", !midiDrawerOpen);
+      if (midiFormSongId !== song.id) {
+        updateMidiForm(song);
+        midiFormSongId = song.id;
+      }
       applyCallSheetFontSize();
 
       const sectionsHtml = song.sections
@@ -1539,6 +1717,7 @@
         callView.classList.remove("hidden");
         trackerView.classList.add("hidden");
         renderCallSheetView();
+        sendCurrentSongMidi();
       }
     }
 
@@ -1553,6 +1732,7 @@
       selectedCallSheetId = Number(id);
       songPickerOpen = false;
       renderCallSheetView();
+      sendCurrentSongMidi();
     }
 
     function stepCallSheetSong(delta) {
@@ -1566,6 +1746,7 @@
       const nextIdx = (safeIdx + delta + orderedSongs.length) % orderedSongs.length;
       selectedCallSheetId = orderedSongs[nextIdx].id;
       renderCallSheetView();
+      sendCurrentSongMidi();
     }
 
     function togglePhraseCuesHandler() {
