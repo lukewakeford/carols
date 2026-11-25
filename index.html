@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Chichester Dec 6 — Electric Guitar Carols Hub</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,6 +37,25 @@
       background-color: var(--bg-main);
       color: var(--text-main);
       transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .app-header {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    }
+
+    @media (max-width: 640px) {
+      .app-header button,
+      .app-header a {
+        min-height: 44px;
+        padding-block: 0.625rem;
+        padding-inline: 0.75rem;
+      }
+
+      input:not([type="file"]),
+      select,
+      textarea {
+        font-size: 16px;
+      }
     }
 
     .font-mono-chord {
@@ -123,7 +142,7 @@
   </div>
 
   <!-- Top Navigation & Stage Controls -->
-  <header id="mainHeader" class="sticky top-0 z-30 border-b surface-card backdrop-blur bg-opacity-95">
+  <header id="mainHeader" class="app-header sticky top-0 z-30 border-b surface-card">
     <div id="trackerHeaderSlot" class="mx-auto max-w-6xl px-3 py-2.5 sm:px-5">
       <!-- Rendered via buildSharedHeaderBar("tracker") -->
     </div>
@@ -181,7 +200,7 @@
   <!-- VIEW 2: GUITAR CHORD & CALL SHEETS -->
   <section id="callSheetsView" class="hidden space-y-3.5">
     <!-- Call Sheet Header Bar (exact same top placement & bar geometry as top header bar) -->
-    <header id="callSheetHeaderBar" class="sticky top-0 z-30 border-b surface-card backdrop-blur bg-opacity-95">
+    <header id="callSheetHeaderBar" class="app-header sticky top-0 z-30 border-b surface-card">
       <div id="callSheetHeaderSlot" class="mx-auto max-w-6xl px-3 py-2.5 sm:px-5">
         <!-- Rendered via buildSharedHeaderBar("callSheets") -->
       </div>
@@ -733,7 +752,7 @@
 
       const rightHtml = isCallSheet
         ? `
-          <div class="relative flex shrink-0 items-center gap-1.5">
+          <div class="relative flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
             <button
               id="toggleTransposeBtn"
               type="button"
