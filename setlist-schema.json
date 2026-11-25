@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Setlist backup",
+  "description": "Generate a JSON object following this schema for import into the setlist app. Return JSON only. Song IDs must be unique positive integers; the array order is the set order. Do not invent chord charts: use only information provided by the user. An import replaces the existing set.",
+  "type": "object",
+  "required": ["version", "songs"],
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "songs": {
+      "type": "array",
+      "description": "Songs in set order. Every song must have a different id.",
+      "items": { "$ref": "#/$defs/song" }
+    },
+    "stageMode": {
+      "type": "boolean"
+    },
+    "midiChannel": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "description": "MIDI channel shared by songs; defaults to 1."
+    },
+    "callSheetFontSize": {
+      "type": "integer",
+      "minimum": 14,
+      "maximum": 28,
+      "description": "Call-sheet text size in pixels; defaults to 16."
+    }
+  },
+  "$defs": {
+    "song": {
+      "type": "object",
+      "required": ["id", "title", "subtitle", "rigNote", "key", "bpm", "meter", "status", "notes", "sections"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "Unique within this set; use 1, 2, 3, etc."
+        },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string", "description": "Artist or arrangement; use an empty string if unknown." },
+        "rigNote": { "type": "string", "description": "Guitar or rig notes; use an empty string if unknown." },
+        "key": {
+          "enum": ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"],
+          "description": "Tonic of the chord chart as a major-key note, without a mode suffix."
+        },
+        "bpm": { "type": "integer", "minimum": 1, "maximum": 511 },
+        "meter": { "type": "string", "description": "Time signature, such as 4/4." },
+        "status": { "enum": ["Rough Edges", "Shaping Up", "Service-Ready"] },
+        "notes": { "type": "string", "description": "General guitar notes; use an empty string if none." },
+        "sections": {
+          "type": "array",
+          "description": "Call-sheet sections in performance order. Use an empty array when no chart is available.",
+          "items": { "$ref": "#/$defs/section" }
+        },
+        "midi": {
+          "description": "Optional per-song MIDI program change and controller message. MIDI BPM is taken from the song's bpm.",
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/midi" }
+          ]
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": ["name", "chords"],
+      "properties": {
+        "name": { "type": "string" },
+        "chords": {
+          "type": "string",
+          "description": "Bars in the song's key, separated by |, e.g. C | F | G | C. Use ||: and :|| for repeat markers. Use an empty string if unknown."
+        },
+        "timingHint": { "type": "string", "description": "Optional section notes or cues." },
+        "patch": { "type": "string", "description": "Optional guitar patch." }
+      }
+    },
+    "midi": {
+      "type": "object",
+      "properties": {
+        "program": { "type": ["integer", "null"], "minimum": 0, "maximum": 127 },
+        "cc": { "type": ["integer", "null"], "minimum": 0, "maximum": 127 },
+        "ccValue": { "type": ["integer", "null"], "minimum": 0, "maximum": 127 }
+      },
+      "anyOf": [
+        { "not": { "anyOf": [{ "required": ["cc"] }, { "required": ["ccValue"] }] } },
+        { "required": ["cc", "ccValue"], "properties": { "cc": { "type": "null" }, "ccValue": { "type": "null" } } },
+        { "required": ["cc", "ccValue"], "properties": { "cc": { "type": "integer" }, "ccValue": { "type": "integer" } } }
+      ],
+      "description": "Use raw MIDI values 0–127. Set both cc and ccValue together, or leave both null/absent."
+    }
+  },
+  "examples": [
+    {
+      "version": 2,
+      "songs": [
+        {
+          "id": 1,
+          "title": "Example song",
+          "subtitle": "",
+          "rigNote": "",
+          "key": "C",
+          "bpm": 100,
+          "meter": "4/4",
+          "status": "Rough Edges",
+          "notes": "",
+          "sections": [],
+          "midi": null
+        }
+      ],
+      "midiChannel": 1,
+      "callSheetFontSize": 16
+    }
+  ]
+}

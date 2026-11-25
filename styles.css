@@ -1,0 +1,165 @@
+    :root {
+      --bg-main: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border-subtle: #e2e8f0;
+      --accent: #0284c7;
+      --accent-soft: #e0f2fe;
+    }
+
+    :root,
+    body.stage-mode {
+      --bg-main: #05070a;
+      --bg-card: #0f141c;
+      --bg-subtle: #18202c;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-subtle: #273244;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .app-header {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    }
+
+    #toastBanner {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+      right: max(env(safe-area-inset-right, 0px), 1rem);
+      max-width: calc(100vw - 2rem);
+    }
+
+    .control-panel {
+      width: fit-content;
+      max-width: 100%;
+      border: 1px solid var(--border-subtle);
+      border-radius: 1rem;
+      padding: 0.75rem;
+      background-color: var(--bg-card);
+    }
+
+    #callSheetContainer .bar-grid,
+    #callSheetContainer .bar-note-text {
+      font-size: var(--call-sheet-font-size, 16px);
+    }
+
+    #callSheetContainer h3,
+    #callSheetContainer .section-patch,
+    #callSheetContainer .section-notes {
+      font-size: calc(var(--call-sheet-font-size, 16px) * 0.875);
+    }
+
+    html,
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      touch-action: manipulation;
+    }
+
+    @media (pointer: coarse) {
+      .app-header {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+      }
+    }
+
+    @media (pointer: coarse), (max-width: 640px) {
+      input:not([type="file"]),
+      select,
+      textarea {
+        font-size: 16px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-header button,
+      .app-header a {
+        min-height: 44px;
+        padding-block: 0.625rem;
+        padding-inline: 0.75rem;
+      }
+    }
+
+    .font-mono-chord {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .surface-card {
+      background-color: var(--bg-card);
+      border-color: var(--border-subtle);
+    }
+
+    .surface-subtle {
+      background-color: var(--bg-subtle);
+      border-color: var(--border-subtle);
+    }
+
+    .text-muted-custom {
+      color: var(--text-muted);
+    }
+
+    /* Custom subtle scrollbar for wide tables on mobile */
+    .table-scroll::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .table-scroll::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.35);
+      border-radius: 9999px;
+    }
+
+    /* Call sheet bar spacing & alternating bar shading */
+    .bar-grid {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .bar-cell {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 0.6rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--border-subtle);
+      line-height: 1.35;
+    }
+
+    .bar-cell-even {
+      background-color: rgba(2, 132, 199, 0.06);
+    }
+
+    .bar-cell-odd {
+      background-color: rgba(148, 163, 184, 0.14);
+    }
+
+    body.stage-mode .bar-cell-even {
+      background-color: rgba(56, 189, 248, 0.12);
+    }
+
+    body.stage-mode .bar-cell-odd {
+      background-color: rgba(15, 23, 42, 0.72);
+    }
+
+    .bar-marker {
+      font-weight: 800;
+      opacity: 0.75;
+      padding: 0 0.15rem;
+    }
+
+    .bar-note-text {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.45;
+    }
