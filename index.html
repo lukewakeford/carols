@@ -144,7 +144,7 @@
 
     .bar-note-text {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 0.8125rem;
+      font-size: 1rem;
       font-weight: 600;
       line-height: 1.45;
     }
@@ -227,8 +227,8 @@
       <!-- Collapsible Transpose Drawer -->
       <div id="transposeDrawer" class="hidden rounded-2xl border p-3 surface-card">
         <div class="mb-2 flex items-center justify-between gap-2">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-muted-custom">Transpose Chords</span>
-          <span id="transposeReadout" class="font-mono-chord text-xs font-bold text-sky-600 dark:text-sky-400">
+          <span class="text-sm font-bold uppercase tracking-wider text-muted-custom">Transpose Chords</span>
+          <span id="transposeReadout" class="font-mono-chord text-sm font-bold text-sky-600 dark:text-sky-400">
             0 semitones (Original)
           </span>
         </div>
@@ -719,6 +719,20 @@
     // =========================================================================
     // 4. TRACKER TABLE & CALL SHEET RENDERERS
     // =========================================================================
+    const headerIcons = {
+      setlist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+      callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      transpose: '<path d="M8 20V4m-4 4 4-4 4 4M16 4v16m-4-4 4 4 4-4"/>',
+      cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+      click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
+      previous: '<path d="m15 18-6-6 6-6"/>',
+      next: '<path d="m9 18 6-6-6-6"/>'
+    };
+
+    function headerIcon(name) {
+      return `<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${headerIcons[name]}</svg>`;
+    }
+
     function buildSharedHeaderBar(mode, song) {
       const isCallSheet = mode === "callSheets";
       const safeSong = song || state.songs.find((s) => s.id === selectedCallSheetId) || state.songs[0];
@@ -728,7 +742,7 @@
           : `Transpose (${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}st)`;
       const cuesText = `Cues: ${showPhraseCues ? "ON" : "OFF"}`;
       const btnBaseClass =
-        "inline-flex items-center justify-center rounded-xl border surface-subtle px-2.5 py-1.5 text-xs font-bold transition";
+        "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border surface-subtle px-2.5 py-1.5 text-base font-bold transition";
       const headerRowClass = "flex min-h-[2.25rem] flex-wrap items-center justify-between gap-2";
 
       const leftHtml = isCallSheet
@@ -740,8 +754,9 @@
               onclick="songPickerOpen = false; switchTab('tracker');"
               class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
               title="Back to Setlist"
+              aria-label="Back to setlist"
             >
-              Setlist
+              ${headerIcon("setlist")}
             </button>
 
             <h2
@@ -760,8 +775,9 @@
               onclick="switchTab('callSheets');"
               class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
               title="Open Call Sheets"
+              aria-label="Open call sheets"
             >
-              Call Sheets
+              ${headerIcon("callSheets")}
             </button>
             <h1 class="min-w-0 flex-1 truncate text-base font-extrabold tracking-tight sm:text-lg">Chichester Dec 6</h1>
           </div>
@@ -774,25 +790,35 @@
               id="toggleTransposeBtn"
               type="button"
               onclick="toggleTransposeDrawer()"
-              class="${btnBaseClass} font-mono-chord hover:border-sky-500"
+              class="${btnBaseClass} gap-1 font-mono-chord hover:border-sky-500"
+              title="${escapeHtml(transposeText)}"
+              aria-label="${escapeHtml(transposeText)}"
+              aria-expanded="${transposeDrawerOpen}"
+              aria-controls="transposeDrawer"
             >
-              ${escapeHtml(transposeText)}
+              ${headerIcon("transpose")}
+              ${transposeSemitones === 0 ? "" : `<span class="text-xs">${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}</span>`}
             </button>
             <button
               id="togglePhraseCuesBtn"
               type="button"
               onclick="togglePhraseCuesHandler()"
-              class="${btnBaseClass} hover:border-sky-500"
+              class="${btnBaseClass} hover:border-sky-500 ${showPhraseCues ? "text-sky-400" : "text-muted-custom"}"
+              title="${escapeHtml(cuesText)}"
+              aria-label="Phrase cues"
+              aria-pressed="${showPhraseCues}"
             >
-              ${escapeHtml(cuesText)}
+              ${headerIcon("cues")}
             </button>
             <button
               id="callSheetClickBtn"
               type="button"
               onclick="toggleMetronomeDrawer()"
               class="${btnBaseClass} hover:border-sky-500"
+              title="Click"
+              aria-label="Toggle metronome"
             >
-              Click
+              ${headerIcon("click")}
             </button>
             <button
               id="songPickerBtn"
@@ -813,8 +839,9 @@
               onclick="stepCallSheetSong(-1)"
               class="${btnBaseClass} hover:border-sky-500"
               title="Previous song"
+              aria-label="Previous song"
             >
-              &lt;
+              ${headerIcon("previous")}
             </button>
             <button
               id="nextSongBtn"
@@ -822,8 +849,9 @@
               onclick="stepCallSheetSong(1)"
               class="${btnBaseClass} hover:border-sky-500"
               title="Next song"
+              aria-label="Next song"
             >
-              &gt;
+              ${headerIcon("next")}
             </button>
 
             <div
@@ -841,7 +869,7 @@
                       role="option"
                       aria-selected="${isSelected}"
                       onclick="selectCallSheetSong(${s.id})"
-                      class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs transition sm:text-sm ${
+                      class="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
                         isSelected
                           ? "bg-sky-600 font-bold text-white"
                           : "font-semibold hover:bg-sky-500/10"
@@ -850,7 +878,7 @@
                       <span class="truncate">
                         <span class="font-mono-chord opacity-80">#${s.id}</span> · ${escapeHtml(s.title)}
                       </span>
-                      <span class="shrink-0 rounded-md px-1.5 py-0.5 font-mono-chord text-[11px] ${
+                      <span class="shrink-0 rounded-md px-1.5 py-0.5 font-mono-chord text-xs ${
                         isSelected ? "bg-white/20 text-white" : "surface-subtle text-muted-custom"
                       }">
                         ${escapeHtml(s.key)}
@@ -877,8 +905,10 @@
               type="button"
               onclick="toggleMetronomeDrawer()"
               class="${btnBaseClass} hover:border-sky-500"
+              title="Click"
+              aria-label="Toggle metronome"
             >
-              Click
+              ${headerIcon("click")}
             </button>
           </div>
         `;
@@ -1142,7 +1172,7 @@
         return `<div class="bar-note-text text-muted-custom">${escapeHtml(trimmed)}</div>`;
       }
 
-      return `<div class="bar-grid font-mono-chord text-xs font-bold sm:text-sm">${items.join("")}</div>`;
+      return `<div class="bar-grid font-mono-chord text-base font-bold">${items.join("")}</div>`;
     }
 
     // In renderCallSheetView()
@@ -1171,9 +1201,9 @@
       document.querySelectorAll(".shift-btn").forEach((btn) => {
         const val = Number(btn.dataset.shift);
         if (val === transposeSemitones) {
-          btn.className = "shift-btn rounded-xl bg-sky-600 px-3 py-1.5 font-mono-chord text-xs font-bold text-white";
+          btn.className = "shift-btn min-h-[44px] min-w-[44px] rounded-xl bg-sky-600 px-3 py-1.5 font-mono-chord text-base font-bold text-white";
         } else {
-          btn.className = "shift-btn rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-xs font-bold hover:border-sky-500";
+          btn.className = "shift-btn min-h-[44px] min-w-[44px] rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-base font-bold hover:border-sky-500";
         }
       });
 
@@ -1182,13 +1212,13 @@
           const renderedChords = transposeProgressionString(sec.chords, transposeSemitones, preferFlats);
           const hintHtml =
             showPhraseCues && sec.timingHint
-              ? `<div class="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
+              ? `<div class="mt-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
                   sec.timingHint
                 )}</div>`
               : "";
           return `
             <div class="rounded-xl border p-3 surface-subtle">
-              <div class="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+              <div class="text-sm font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
                 ${escapeHtml(sec.name)}
               </div>
               <div class="mt-2">
