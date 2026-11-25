@@ -246,32 +246,6 @@
 
     <div class="mx-auto max-w-6xl space-y-3.5 px-3 sm:px-5">
       <div id="callSheetControls" class="flex flex-wrap items-start gap-3">
-      <!-- Collapsible Transpose Drawer -->
-      <div id="transposeDrawer" class="control-panel hidden">
-        <div class="mb-2 flex items-center justify-between gap-2">
-          <span class="text-sm font-bold uppercase tracking-wider text-muted-custom">Transpose Chords</span>
-          <span id="transposeReadout" class="font-mono-chord text-sm font-bold text-sky-600 dark:text-sky-400">
-            0 semitones (Original)
-          </span>
-        </div>
-        <div class="flex flex-wrap items-center gap-1.5">
-          <button data-shift="-3" class="shift-btn rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-xs font-bold hover:border-sky-500">
-            -3st
-          </button>
-          <button data-shift="-1" class="shift-btn rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-xs font-bold hover:border-sky-500">
-            -1
-          </button>
-          <button data-shift="0" class="shift-btn rounded-xl bg-sky-600 px-3 py-1.5 font-mono-chord text-xs font-bold text-white">
-            0
-          </button>
-          <button data-shift="1" class="shift-btn rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-xs font-bold hover:border-sky-500">
-            +1
-          </button>
-          <button data-shift="2" class="shift-btn rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-xs font-bold hover:border-sky-500">
-            +2
-          </button>
-        </div>
-      </div>
       <div id="fontSizeDrawer" class="control-panel hidden">
         <label for="callSheetFontSize" class="mb-2 block text-sm font-bold uppercase tracking-wider text-muted-custom">Call-sheet text size</label>
         <div class="flex flex-wrap items-center gap-3">
@@ -628,8 +602,6 @@
     let activeSort = "order";
     let activeTab = "tracker";
     let selectedCallSheetId = 1;
-    let transposeSemitones = 0;
-    let transposeDrawerOpen = false;
     let fontSizeDrawerOpen = false;
     let showPhraseCues = true;
     let songPickerOpen = false;
@@ -648,6 +620,7 @@
           const saved = Array.isArray(parsed.songs) ? parsed.songs.find((s) => s.id === def.id) : null;
           return {
             ...def,
+            key: typeof saved?.key === "string" && /^[A-G][#b]?$/.test(saved.key) ? saved.key : def.key,
             status: saved?.status || def.status,
             notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
             sections: Array.isArray(saved?.sections) && saved.sections.every((section) =>
@@ -679,6 +652,7 @@
       try {
         const slim = state.songs.map((s) => ({
           id: s.id,
+          key: s.key,
           status: s.status,
           notes: s.notes,
           sections: s.sections.map(({ name, chords, timingHint, patch }) => ({ name, chords, timingHint, patch }))
@@ -742,7 +716,7 @@
       // Preserve bracketed notes or N.C.
       if (token.startsWith("[") || token === "N.C.") return token;
       // Match leading note (e.g. F#, Bb, C) + remainder + optional /bassNote
-      const match = token.match(/^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/);
+      const match = token.match(/^([A-G][#b]?)((?:(?:maj|min|dim|aug|sus|add|m|M)|[0-9#b+-]|\([0-9#b,+ -]+\))*)(?:\/([A-G][#b]?))?$/);
       if (!match) return token;
       const [, root, qual, bass] = match;
       const newRoot = transposeRoot(root, semitones, preferFlats);
@@ -754,10 +728,10 @@
       if (!semitones) return line;
       // Split by whitespace while keeping punctuation like | or :|| intact
       return line
-        .split(/(\s+)/)
+        .split(/(\[[^\]]*\]|\s+|[|:]+)/)
         .map((part) => {
           if (/^\s+$/.test(part)) return part;
-          if (/^[|:]+$/.test(part) || part.startsWith("(") || part.endsWith(")")) return part;
+          if (/^[|:]+$/.test(part) || part.startsWith("(")) return part;
           return transposeChordToken(part, semitones, preferFlats);
         })
         .join("");
@@ -769,7 +743,6 @@
     const headerIcons = {
       setlist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
       callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
-      transpose: '<path d="M8 20V4m-4 4 4-4 4 4M16 4v16m-4-4 4 4 4-4"/>',
       fontSize: '<path d="m3 19 6-14 6 14M5 14h8M17 10h6M20 10v9"/>',
       cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
@@ -785,10 +758,6 @@
     function buildSharedHeaderBar(mode, song) {
       const isCallSheet = mode === "callSheets";
       const safeSong = song || state.songs.find((s) => s.id === selectedCallSheetId) || state.songs[0];
-      const transposeText =
-        transposeSemitones === 0
-          ? "Transpose"
-          : `Transpose (${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}st)`;
       const cuesText = `Cues: ${showPhraseCues ? "ON" : "OFF"}`;
       const btnBaseClass =
         "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border surface-subtle px-2.5 py-1.5 text-base font-bold transition";
@@ -814,6 +783,7 @@
             >
               ${escapeHtml(safeSong.title)}
             </h2>
+            <span class="shrink-0 font-mono-chord text-sm font-bold text-muted-custom">${escapeHtml(safeSong.key)}</span>
           </div>
         `
         : `
@@ -835,19 +805,6 @@
       const rightHtml = isCallSheet
         ? `
           <div class="relative flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
-            <button
-              id="toggleTransposeBtn"
-              type="button"
-              onclick="toggleTransposeDrawer()"
-              class="${btnBaseClass} gap-1 font-mono-chord hover:border-sky-500"
-              title="${escapeHtml(transposeText)}"
-              aria-label="${escapeHtml(transposeText)}"
-              aria-expanded="${transposeDrawerOpen}"
-              aria-controls="transposeDrawer"
-            >
-              ${headerIcon("transpose")}
-              ${transposeSemitones === 0 ? "" : `<span class="text-xs">${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}</span>`}
-            </button>
             <button
               id="toggleFontSizeBtn"
               type="button"
@@ -1076,6 +1033,27 @@
       }
     }
 
+    function updateSongKey(id, key) {
+      const song = state.songs.find((s) => s.id === id);
+      const previousKey = song.key;
+      const previousSections = song.sections;
+      const semitones = noteToIndex(key) - noteToIndex(previousKey);
+      const preferFlats = key.includes("b") || key === "F";
+      song.sections = song.sections.map((section) => ({
+        ...section,
+        chords: transposeProgressionString(section.chords, semitones, preferFlats)
+      }));
+      song.key = key;
+      const saved = saveState();
+      if (!saved) {
+        song.key = previousKey;
+        song.sections = previousSections;
+      }
+      renderTrackerTable();
+      renderCallSheetView();
+      if (saved) showToast(`Key changed to ${key}; call sheet transposed and saved.`);
+    }
+
     function updateSongStatus(id, newStatus) {
       const target = state.songs.find((s) => s.id === id);
       if (!target) return;
@@ -1137,9 +1115,18 @@
 
               <!-- Key & Rig -->
               <td class="px-3 py-3.5">
-                <span class="inline-block rounded-lg border px-2.5 py-1 font-mono-chord text-xs font-bold surface-subtle">
-                  Key: ${escapeHtml(song.key)}
-                </span>
+                <label class="inline-flex items-center gap-2 text-sm font-bold">
+                  Key
+                  <select
+                    aria-label="Key for ${escapeHtml(song.title)}"
+                    onchange="updateSongKey(${song.id}, this.value)"
+                    class="min-h-[44px] rounded-lg border px-2.5 py-1 font-mono-chord text-base font-bold surface-subtle"
+                  >
+                    ${["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"].map((key) =>
+                      `<option value="${key}" ${song.key === key ? "selected" : ""}>${key}</option>`
+                    ).join("")}
+                  </select>
+                </label>
                 <div class="mt-1.5 max-w-[180px] text-xs text-muted-custom">
                   ${escapeHtml(song.rigNote)}
                 </div>
@@ -1311,34 +1298,12 @@
         headerSlot.innerHTML = buildSharedHeaderBar("callSheets", song);
       }
 
-      const preferFlats = transposeSemitones < 0 || ["F", "Bb", "Eb", "Ab", "Cm"].includes(song.key);
-      const transposedKey = transposeChordToken(song.key, transposeSemitones, preferFlats);
-
-      const drawerEl = document.getElementById("transposeDrawer");
-      drawerEl.classList.toggle("hidden", !transposeDrawerOpen);
       document.getElementById("fontSizeDrawer").classList.toggle("hidden", !fontSizeDrawerOpen);
       applyCallSheetFontSize();
-
-      const shiftLabel =
-        transposeSemitones === 0
-          ? "0 semitones (Original)"
-          : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones} semitones → ${transposedKey}`;
-      document.getElementById("transposeReadout").textContent = shiftLabel;
-
-      // Highlight active shift button
-      document.querySelectorAll(".shift-btn").forEach((btn) => {
-        const val = Number(btn.dataset.shift);
-        if (val === transposeSemitones) {
-          btn.className = "shift-btn min-h-[44px] min-w-[44px] rounded-xl bg-sky-600 px-3 py-1.5 font-mono-chord text-base font-bold text-white";
-        } else {
-          btn.className = "shift-btn min-h-[44px] min-w-[44px] rounded-xl border surface-subtle px-3 py-1.5 font-mono-chord text-base font-bold hover:border-sky-500";
-        }
-      });
 
       const sectionsHtml = song.sections
         .map((sec, sectionIndex) => {
           const isEditing = editingCallSheetSection === `${song.id}:${sectionIndex}`;
-          const renderedChords = transposeProgressionString(sec.chords, transposeSemitones, preferFlats);
           const hintHtml =
             showPhraseCues && sec.timingHint
               ? `<div class="section-notes mt-1.5 whitespace-pre-wrap text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
@@ -1381,7 +1346,7 @@
                     class="mb-3 mt-2 w-full rounded-xl border p-3 text-base surface-card focus:border-sky-500 focus:outline-none"
                   />
                   <label for="sectionChordsEditor" class="block text-sm font-semibold">
-                    Bars in original key (${escapeHtml(song.key)})
+                    Bars in selected key (${escapeHtml(song.key)})
                   </label>
                   <p id="sectionEditorHelp" class="my-2 text-sm text-muted-custom">
                     Separate bars with | (e.g. C | F | G). Edit chords, add a bar with |,
@@ -1409,7 +1374,7 @@
                     class="mt-3 min-h-[44px] rounded-xl border border-rose-400/40 px-3 py-2 text-sm font-semibold text-rose-400 hover:border-rose-400"
                     aria-label="Remove section ${escapeHtml(sec.name)}"
                   >Remove section</button>
-                ` : renderBarBlocksHtml(renderedChords)}
+                ` : renderBarBlocksHtml(sec.chords)}
               </div>
               ${isEditing ? "" : hintHtml}
             </div>
@@ -1604,11 +1569,6 @@
       renderCallSheetView();
     }
 
-    function toggleTransposeDrawer() {
-      transposeDrawerOpen = !transposeDrawerOpen;
-      renderCallSheetView();
-    }
-
     function togglePhraseCuesHandler() {
       showPhraseCues = !showPhraseCues;
       renderCallSheetView();
@@ -1622,13 +1582,6 @@
         songPickerOpen = false;
         renderCallSheetView();
       }
-    });
-
-    document.querySelectorAll(".shift-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        transposeSemitones = Number(btn.dataset.shift);
-        renderCallSheetView();
-      });
     });
 
     function syncHeaderVisibilityForTab(tabName) {
