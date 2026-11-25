@@ -607,6 +607,7 @@
     let transposeDrawerOpen = false;
     let showPhraseCues = true;
     let songPickerOpen = false;
+    let editingCallSheetSection = null;
 
     function loadState() {
       try {
@@ -616,13 +617,19 @@
         if (!Array.isArray(parsed.songs) || parsed.songs.length === 0) {
           return { songs: structuredClone(DEFAULT_SONGS), stageMode: true };
         }
-        // Merge saved status & notes onto all default song definitions so all 10 tracks stay present
+        // Keep all default songs while restoring locally edited fields.
         const merged = DEFAULT_SONGS.map((def) => {
           const saved = Array.isArray(parsed.songs) ? parsed.songs.find((s) => s.id === def.id) : null;
           return {
             ...def,
             status: saved?.status || def.status,
-            notes: typeof saved?.notes === "string" ? saved.notes : def.notes
+            notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
+            sections: def.sections.map((section, index) => ({
+              ...section,
+              chords: typeof saved?.sections?.[index]?.chords === "string"
+                ? saved.sections[index].chords
+                : section.chords
+            }))
           };
         });
         return { songs: merged, stageMode: true };
@@ -637,14 +644,18 @@
         const slim = state.songs.map((s) => ({
           id: s.id,
           status: s.status,
-          notes: s.notes
+          notes: s.notes,
+          sections: s.sections.map((section) => ({ chords: section.chords }))
         }));
         localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({ songs: slim, stageMode: true })
         );
+        return true;
       } catch (err) {
         console.error("Failed to save state:", err);
+        showToast("Could not save changes. Keep this page open and try again.");
+        return false;
       }
     }
 
@@ -1020,17 +1031,16 @@
       const target = state.songs.find((s) => s.id === id);
       if (!target) return;
       target.status = newStatus;
-      saveState();
+      const saved = saveState();
       renderTrackerTable();
-      showToast(`#${id} marked as ${newStatus}`);
+      if (saved) showToast(`#${id} marked as ${newStatus}`);
     }
 
     function updateSongNotes(id, newNotes) {
       const target = state.songs.find((s) => s.id === id);
       if (!target) return;
       target.notes = newNotes;
-      saveState();
-      showToast(`Saved guitar notes for #${id}`);
+      if (saveState()) showToast(`Saved guitar notes for #${id}`);
     }
 
     function renderTrackerTable() {
@@ -1186,7 +1196,27 @@
       return `<div class="bar-grid font-mono-chord text-base font-bold">${items.join("")}</div>`;
     }
 
-    // In renderCallSheetView()
+    function editCallSheetSection(sectionIndex) {
+      editingCallSheetSection = `${selectedCallSheetId}:${sectionIndex}`;
+      renderCallSheetView();
+      document.getElementById("sectionChordsEditor").focus();
+    }
+
+    function updateCallSheetSection(songId, sectionIndex, chords) {
+      const song = state.songs.find((s) => s.id === songId);
+      song.sections[sectionIndex].chords = chords;
+      const saved = saveState();
+      document.getElementById("sectionSaveStatus").textContent = saved
+        ? "Saved on this device."
+        : "Not saved. Keep this page open and try editing again.";
+    }
+
+    function finishEditingCallSheetSection() {
+      if (!saveState()) return;
+      editingCallSheetSection = null;
+      renderCallSheetView();
+    }
+
     function renderCallSheetView() {
       const song = state.songs.find((s) => s.id === selectedCallSheetId) || state.songs[0];
       selectedCallSheetId = song.id;
@@ -1219,7 +1249,8 @@
       });
 
       const sectionsHtml = song.sections
-        .map((sec) => {
+        .map((sec, sectionIndex) => {
+          const isEditing = editingCallSheetSection === `${song.id}:${sectionIndex}`;
           const renderedChords = transposeProgressionString(sec.chords, transposeSemitones, preferFlats);
           const hintHtml =
             showPhraseCues && sec.timingHint
@@ -1229,11 +1260,36 @@
               : "";
           return `
             <div class="rounded-xl border p-3 surface-subtle">
-              <div class="text-sm font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                ${escapeHtml(sec.name)}
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-sm font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                  ${escapeHtml(sec.name)}
+                </h3>
+                <button
+                  type="button"
+                  class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-card hover:border-sky-500"
+                  onclick="${isEditing ? "finishEditingCallSheetSection()" : `editCallSheetSection(${sectionIndex})`}"
+                  aria-label="${isEditing ? "Done editing" : "Edit bars for"} ${escapeHtml(sec.name)}"
+                >${isEditing ? "Done" : "Edit bars"}</button>
               </div>
               <div class="mt-2">
-                ${renderBarBlocksHtml(renderedChords)}
+                ${isEditing ? `
+                  <label for="sectionChordsEditor" class="block text-sm font-semibold">
+                    Bars in original key (${escapeHtml(song.key)})
+                  </label>
+                  <p id="sectionEditorHelp" class="my-2 text-sm text-muted-custom">
+                    Separate bars with | (e.g. C | F | G). Edit chords, add a bar with |,
+                    or remove a bar and its separator. Keep repeat markers such as ||: and :||.
+                    Changes save automatically on this device, not to other devices.
+                  </p>
+                  <textarea
+                    id="sectionChordsEditor"
+                    rows="5"
+                    aria-describedby="sectionEditorHelp sectionSaveStatus"
+                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, this.value)"
+                    class="w-full rounded-xl border p-3 font-mono-chord text-base leading-relaxed surface-card focus:border-sky-500 focus:outline-none"
+                  >${escapeHtml(sec.chords)}</textarea>
+                  <p id="sectionSaveStatus" role="status" class="mt-2 text-sm text-muted-custom"></p>
+                ` : renderBarBlocksHtml(renderedChords)}
               </div>
               ${hintHtml}
             </div>
