@@ -624,7 +624,10 @@
             ...def,
             status: saved?.status || def.status,
             notes: typeof saved?.notes === "string" ? saved.notes : def.notes,
-            sections: def.sections.map((section, index) => ({
+            sections: Array.isArray(saved?.sections) && saved.sections.every((section) =>
+              typeof section?.name === "string" && typeof section.chords === "string" &&
+              (section.timingHint === undefined || typeof section.timingHint === "string")
+            ) ? saved.sections : def.sections.map((section, index) => ({
               ...section,
               chords: typeof saved?.sections?.[index]?.chords === "string"
                 ? saved.sections[index].chords
@@ -645,7 +648,7 @@
           id: s.id,
           status: s.status,
           notes: s.notes,
-          sections: s.sections.map((section) => ({ chords: section.chords }))
+          sections: s.sections.map(({ name, chords, timingHint }) => ({ name, chords, timingHint }))
         }));
         localStorage.setItem(
           STORAGE_KEY,
@@ -1202,9 +1205,9 @@
       document.getElementById("sectionChordsEditor").focus();
     }
 
-    function updateCallSheetSection(songId, sectionIndex, chords) {
+    function updateCallSheetSection(songId, sectionIndex, field, value) {
       const song = state.songs.find((s) => s.id === songId);
-      song.sections[sectionIndex].chords = chords;
+      song.sections[sectionIndex][field] = value;
       const saved = saveState();
       document.getElementById("sectionSaveStatus").textContent = saved
         ? "Saved on this device."
@@ -1215,6 +1218,29 @@
       if (!saveState()) return;
       editingCallSheetSection = null;
       renderCallSheetView();
+    }
+
+    function addCallSheetSection() {
+      const song = state.songs.find((s) => s.id === selectedCallSheetId);
+      song.sections.push({ name: "New section", chords: "", timingHint: "" });
+      if (!saveState()) {
+        song.sections.pop();
+        return;
+      }
+      editCallSheetSection(song.sections.length - 1);
+      document.getElementById("sectionTitleEditor").focus();
+    }
+
+    function removeCallSheetSection(sectionIndex) {
+      const song = state.songs.find((s) => s.id === selectedCallSheetId);
+      const [removed] = song.sections.splice(sectionIndex, 1);
+      if (!saveState()) {
+        song.sections.splice(sectionIndex, 0, removed);
+        return;
+      }
+      editingCallSheetSection = null;
+      renderCallSheetView();
+      showToast("Section removed.");
     }
 
     function renderCallSheetView() {
@@ -1254,7 +1280,7 @@
           const renderedChords = transposeProgressionString(sec.chords, transposeSemitones, preferFlats);
           const hintHtml =
             showPhraseCues && sec.timingHint
-              ? `<div class="mt-1.5 text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
+              ? `<div class="mt-1.5 whitespace-pre-wrap text-sm font-medium text-amber-700 dark:text-amber-300">${escapeHtml(
                   sec.timingHint
                 )}</div>`
               : "";
@@ -1266,13 +1292,21 @@
                 </h3>
                 <button
                   type="button"
-                  class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-card hover:border-sky-500"
+                  class="min-h-[44px] px-2 py-2 text-xs text-muted-custom hover:text-sky-400"
                   onclick="${isEditing ? "finishEditingCallSheetSection()" : `editCallSheetSection(${sectionIndex})`}"
-                  aria-label="${isEditing ? "Done editing" : "Edit bars for"} ${escapeHtml(sec.name)}"
+                  aria-label="${isEditing ? "Done editing" : "Edit section"} ${escapeHtml(sec.name)}"
                 >${isEditing ? "Done" : "Edit bars"}</button>
               </div>
               <div class="mt-2">
                 ${isEditing ? `
+                  <label for="sectionTitleEditor" class="block text-sm font-semibold">Section title</label>
+                  <input
+                    id="sectionTitleEditor"
+                    type="text"
+                    value="${escapeHtml(sec.name)}"
+                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, 'name', this.value)"
+                    class="mb-3 mt-2 w-full rounded-xl border p-3 text-base surface-card focus:border-sky-500 focus:outline-none"
+                  />
                   <label for="sectionChordsEditor" class="block text-sm font-semibold">
                     Bars in original key (${escapeHtml(song.key)})
                   </label>
@@ -1285,13 +1319,26 @@
                     id="sectionChordsEditor"
                     rows="5"
                     aria-describedby="sectionEditorHelp sectionSaveStatus"
-                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, this.value)"
+                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, 'chords', this.value)"
                     class="w-full rounded-xl border p-3 font-mono-chord text-base leading-relaxed surface-card focus:border-sky-500 focus:outline-none"
                   >${escapeHtml(sec.chords)}</textarea>
+                  <label for="sectionNotesEditor" class="mt-3 block text-sm font-semibold">Section notes / cues</label>
+                  <textarea
+                    id="sectionNotesEditor"
+                    rows="3"
+                    oninput="updateCallSheetSection(${song.id}, ${sectionIndex}, 'timingHint', this.value)"
+                    class="mt-2 w-full rounded-xl border p-3 text-base surface-card focus:border-sky-500 focus:outline-none"
+                  >${escapeHtml(sec.timingHint || "")}</textarea>
                   <p id="sectionSaveStatus" role="status" class="mt-2 text-sm text-muted-custom"></p>
+                  <button
+                    type="button"
+                    onclick="removeCallSheetSection(${sectionIndex})"
+                    class="mt-3 min-h-[44px] rounded-xl border border-rose-400/40 px-3 py-2 text-sm font-semibold text-rose-400 hover:border-rose-400"
+                    aria-label="Remove section ${escapeHtml(sec.name)}"
+                  >Remove section</button>
                 ` : renderBarBlocksHtml(renderedChords)}
               </div>
-              ${hintHtml}
+              ${isEditing ? "" : hintHtml}
             </div>
           `;
         })
@@ -1302,6 +1349,11 @@
           <div class="grid gap-2.5 md:grid-cols-2">
             ${sectionsHtml}
           </div>
+          <button
+            type="button"
+            onclick="addCallSheetSection()"
+            class="mt-3 min-h-[44px] rounded-xl border px-3 py-2 text-sm font-semibold text-muted-custom hover:border-sky-500 surface-subtle"
+          >+ Add section</button>
         </div>
       `;
     }
