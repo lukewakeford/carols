@@ -47,7 +47,7 @@
           typeof song.title === "string" && typeof song.subtitle === "string" &&
           typeof song.rigNote === "string" && typeof song.meter === "string" &&
           typeof song.notes === "string" && typeof song.status === "string" &&
-          typeof song.key === "string" && /^[A-G][#b]?$/.test(song.key) &&
+          typeof song.key === "string" && /^[A-G][#b]?m?$/.test(song.key) &&
           Number.isInteger(song.bpm) && song.bpm >= 1 && song.bpm <= 511 &&
           Array.isArray(song.sections) && song.sections.every((section) => typeof section.name === "string")
         )) throw new Error("Invalid song details.");
@@ -659,8 +659,8 @@
       const song = state.songs.find((s) => s.id === id);
       const previousKey = song.key;
       const previousSections = song.sections;
-      const semitones = noteToIndex(key) - noteToIndex(previousKey);
-      const preferFlats = key.includes("b") || key === "F";
+      const semitones = noteToIndex(key.replace(/m$/, "")) - noteToIndex(previousKey.replace(/m$/, ""));
+      const preferFlats = key.includes("b") || ["F", "Dm", "Gm", "Cm", "Fm"].includes(key);
       song.sections = song.sections.map((section) => ({
         ...section,
         chords: transposeProgressionString(section.chords, semitones, preferFlats)
@@ -673,7 +673,9 @@
       }
       renderTrackerTable();
       renderCallSheetView();
-      if (saved) showToast(`Key changed to ${key}; call sheet transposed and saved.`);
+      if (saved) showToast(semitones
+        ? `Key changed to ${key}; call sheet transposed and saved.`
+        : `Key changed to ${key} and saved.`);
     }
 
     function updateSongBpm(id, input) {
@@ -771,9 +773,14 @@
                     onchange="updateSongKey(${song.id}, this.value)"
                     class="min-h-[44px] rounded-lg border px-2.5 py-1 font-mono-chord text-base font-bold surface-subtle"
                   >
-                    ${["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"].map((key) =>
-                      `<option value="${key}" ${song.key === key ? "selected" : ""}>${key}</option>`
-                    ).join("")}
+                    ${["", "m"].map((suffix) => `
+                      <optgroup label="${suffix ? "Minor" : "Major"}">
+                        ${["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"].map((note) => {
+                          const key = note + suffix;
+                          return `<option value="${key}" ${song.key === key ? "selected" : ""}>${key}</option>`;
+                        }).join("")}
+                      </optgroup>
+                    `).join("")}
                   </select>
                 </label>
                 <div class="mt-1.5 max-w-[180px] text-xs text-muted-custom">

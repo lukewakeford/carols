@@ -44,8 +44,8 @@
         "subtitle": { "type": "string", "description": "Artist or arrangement; use an empty string if unknown." },
         "rigNote": { "type": "string", "description": "Guitar or rig notes; use an empty string if unknown." },
         "key": {
-          "enum": ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"],
-          "description": "Tonic of the chord chart as a major-key note, without a mode suffix."
+          "enum": ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B", "Cm", "C#m", "Dbm", "Dm", "D#m", "Ebm", "Em", "Fm", "F#m", "Gbm", "Gm", "G#m", "Abm", "Am", "A#m", "Bbm", "Bm"],
+          "description": "Tonic and mode of the chord chart: a note for major, or a note followed by m for minor (e.g. Cm)."
         },
         "bpm": { "type": "integer", "minimum": 1, "maximum": 511 },
         "meter": { "type": "string", "description": "Time signature, such as 4/4." },
