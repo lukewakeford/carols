@@ -13,6 +13,7 @@
     let showPhraseCues = true;
     let songPickerOpen = false;
     let editingCallSheetSection = null;
+    let reorderingCallSheetSongId = null;
     let midiDrawerOpen = false;
     let midiAccess = null;
     let midiOutputId = "";
@@ -1073,6 +1074,7 @@
         song.sections.pop();
         return;
       }
+      reorderingCallSheetSongId = null;
       editCallSheetSection(song.sections.length - 1);
       document.getElementById("sectionTitleEditor").focus();
     }
@@ -1089,6 +1091,100 @@
       showToast("Section removed.");
     }
 
+    function toggleSectionReordering() {
+      if (editingCallSheetSection !== null && !saveState()) return;
+      editingCallSheetSection = null;
+      reorderingCallSheetSongId = reorderingCallSheetSongId === selectedCallSheetId ? null : selectedCallSheetId;
+      renderCallSheetView();
+      document.getElementById("reorderSectionsBtn").focus();
+    }
+
+    function moveCallSheetSection(from, to, focusDirection = null) {
+      const song = state.songs.find((s) => s.id === selectedCallSheetId);
+      if (from === to || from < 0 || to < 0 || from >= song.sections.length || to >= song.sections.length) return;
+      const previousSections = song.sections;
+      song.sections = [...previousSections];
+      const [section] = song.sections.splice(from, 1);
+      song.sections.splice(to, 0, section);
+      if (!saveState()) {
+        song.sections = previousSections;
+        return;
+      }
+      renderCallSheetView();
+      if (focusDirection !== null) {
+        const direction = to === 0 ? 1 : to === song.sections.length - 1 ? -1 : focusDirection;
+        document.getElementById(`moveSection-${to}-${direction}`)?.focus();
+      }
+      showToast(`Section moved to #${to + 1}.`);
+    }
+
+    function startSectionDrag(event, from) {
+      if (!event.isPrimary || event.button !== 0) return;
+      const handle = event.currentTarget;
+      const list = document.getElementById("sectionReorderList");
+      const rows = [...list.querySelectorAll("[data-section-index]")];
+      const source = rows[from];
+      let target = null;
+      let moved = false;
+      let pointerX = event.clientX;
+      let pointerY = event.clientY;
+      let scrollFrame = null;
+      handle.setPointerCapture(event.pointerId);
+      source.classList.add("section-dragging");
+
+      function updateTarget() {
+        const listRect = list.getBoundingClientRect();
+        let next = null;
+        if (pointerX >= listRect.left && pointerX <= listRect.right &&
+            pointerY >= listRect.top && pointerY <= listRect.bottom) {
+          next = rows.reduce((closest, row, index) => {
+            const rect = row.getBoundingClientRect();
+            const distance = Math.abs(pointerY - (rect.top + rect.bottom) / 2);
+            return distance < closest.distance ? { index, distance } : closest;
+          }, { index: null, distance: Infinity }).index;
+        }
+        rows.forEach((row, index) => row.classList.toggle("section-drop-target", moved && index === next && next !== from));
+        target = next;
+      }
+
+      function autoScroll() {
+        if (!moved) return;
+        const edge = 60;
+        const speed = pointerY < edge ? -12 : pointerY > window.innerHeight - edge ? 12 : 0;
+        if (speed) {
+          window.scrollBy(0, speed);
+          updateTarget();
+          scrollFrame = requestAnimationFrame(autoScroll);
+        } else {
+          scrollFrame = null;
+        }
+      }
+
+      function onMove(moveEvent) {
+        pointerX = moveEvent.clientX;
+        pointerY = moveEvent.clientY;
+        if (Math.hypot(pointerX - event.clientX, pointerY - event.clientY) > 5) moved = true;
+        updateTarget();
+        if (moved && scrollFrame === null) autoScroll();
+      }
+
+      function finish(endEvent) {
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        handle.removeEventListener("lostpointercapture", finish);
+        if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+        source.classList.remove("section-dragging");
+        rows.forEach((row) => row.classList.remove("section-drop-target"));
+        if (endEvent.type === "pointerup" && moved && target !== null) moveCallSheetSection(from, target);
+      }
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+      handle.addEventListener("lostpointercapture", finish);
+    }
+
     function renderCallSheetView() {
       const song = state.songs.find((s) => s.id === selectedCallSheetId) || state.songs[0];
       if (!song) {
@@ -1098,6 +1194,8 @@
         return;
       }
       selectedCallSheetId = song.id;
+      if (reorderingCallSheetSongId !== song.id) reorderingCallSheetSongId = null;
+      const isReordering = reorderingCallSheetSongId === song.id;
 
       const headerSlot = document.getElementById("callSheetHeaderSlot");
       if (headerSlot) {
@@ -1195,14 +1293,36 @@
 
       document.getElementById("callSheetContainer").innerHTML = `
         <div class="rounded-2xl border p-4 surface-card shadow-sm">
-          <div class="grid gap-2.5 md:grid-cols-2">
-            ${sectionsHtml}
-          </div>
+          ${isReordering ? `
+            <p class="mb-3 text-sm text-muted-custom">Drag a handle onto another section, or use the arrows. Changes save automatically.</p>
+            <div id="sectionReorderList" class="grid gap-2">
+              ${song.sections.map((sec, index) => `
+                <div data-section-index="${index}" class="section-reorder-row flex items-center gap-2 rounded-xl border p-2 surface-subtle">
+                  <button type="button" onpointerdown="startSectionDrag(event, ${index})"
+                    aria-label="Drag ${escapeHtml(sec.name || `section ${index + 1}`)} to reorder"
+                    title="Drag to reorder" class="section-drag-handle min-h-[44px] min-w-[44px] rounded-lg text-xl text-muted-custom">☰</button>
+                  <span class="min-w-0 flex-1 break-words font-semibold">${escapeHtml(sec.name || `Section ${index + 1}`)}</span>
+                  <button id="moveSection-${index}--1" type="button" onclick="moveCallSheetSection(${index}, ${index - 1}, -1)"
+                    aria-label="Move ${escapeHtml(sec.name || `section ${index + 1}`)} up" title="Move up"
+                    ${index === 0 ? "disabled" : ""}
+                    class="min-h-[44px] min-w-[44px] rounded-lg text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↑</button>
+                  <button id="moveSection-${index}-1" type="button" onclick="moveCallSheetSection(${index}, ${index + 1}, 1)"
+                    aria-label="Move ${escapeHtml(sec.name || `section ${index + 1}`)} down" title="Move down"
+                    ${index === song.sections.length - 1 ? "disabled" : ""}
+                    class="min-h-[44px] min-w-[44px] rounded-lg text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↓</button>
+                </div>
+              `).join("")}
+            </div>
+          ` : `<div class="grid gap-2.5 md:grid-cols-2">${sectionsHtml}</div>`}
           <button
             type="button"
             onclick="addCallSheetSection()"
             class="mt-3 min-h-[44px] rounded-xl border px-3 py-2 text-sm font-semibold text-muted-custom hover:border-sky-500 surface-subtle"
           >+ Add section</button>
+          <button id="reorderSectionsBtn" type="button" onclick="toggleSectionReordering()"
+            aria-pressed="${isReordering}" ${song.sections.length < 2 && !isReordering ? "disabled" : ""}
+            class="mt-3 min-h-[44px] rounded-xl border px-3 py-2 text-sm font-semibold text-muted-custom hover:border-sky-500 disabled:opacity-30 surface-subtle"
+          >${isReordering ? "Done reordering" : "Reorder sections"}</button>
         </div>
       `;
     }

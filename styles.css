@@ -122,6 +122,20 @@
       min-width: 18rem;
     }
 
+    .section-drag-handle {
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .section-dragging {
+      opacity: 0.5;
+    }
+
+    .section-drop-target {
+      outline: 2px solid var(--accent);
+    }
+
     /* Custom subtle scrollbar for wide tables on mobile */
     .table-scroll::-webkit-scrollbar {
       height: 8px;
