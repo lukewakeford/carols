@@ -108,6 +108,16 @@
       color: var(--text-muted);
     }
 
+    .call-sheet-column {
+      width: 3.5rem;
+      min-width: 3.5rem;
+      max-width: 3.5rem;
+    }
+
+    .order-column {
+      left: 3.5rem;
+    }
+
     /* Custom subtle scrollbar for wide tables on mobile */
     .table-scroll::-webkit-scrollbar {
       height: 8px;

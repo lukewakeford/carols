@@ -723,7 +723,7 @@
       if (rows.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" class="px-6 py-10 text-center text-sm text-muted-custom">
+            <td colspan="7" class="px-6 py-10 text-center text-sm text-muted-custom">
               No songs yet. Add a song to get started.
             </td>
           </tr>
@@ -735,33 +735,36 @@
         .map((song) => {
           return `
             <tr class="align-top transition hover:bg-sky-500/[0.03]">
+              <td class="call-sheet-column sticky left-0 z-10 text-center surface-card">
+                <button type="button" onclick="openCallSheetForSong(${song.id})"
+                  aria-label="Open call sheet for ${escapeHtml(song.title)}" title="Open call sheet"
+                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-sky-400 hover:bg-sky-500/20">
+                  ${headerIcon("callSheets")}
+                </button>
+              </td>
+
               <!-- Setlist order -->
-              <td class="sticky left-0 z-10 border-r px-3 py-3.5 text-center font-mono-chord text-sm font-extrabold surface-card" style="border-color: var(--border-subtle);">
-                #${state.songs.indexOf(song) + 1}
+              <td class="order-column sticky z-10 border-r px-2 py-1 text-center surface-card" style="border-color: var(--border-subtle);">
+                <div class="flex items-center justify-center gap-1">
+                  <span class="font-mono-chord text-sm font-extrabold">#${state.songs.indexOf(song) + 1}</span>
+                  <div class="flex flex-col">
+                    <button id="moveSong-${song.id}--1" type="button" onclick="moveSong(${song.id}, -1)"
+                      aria-label="Move ${escapeHtml(song.title)} up in setlist" title="Move up"
+                      ${state.songs.indexOf(song) === 0 ? "disabled" : ""}
+                      class="h-8 w-8 rounded text-sm font-bold text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↑</button>
+                    <button id="moveSong-${song.id}-1" type="button" onclick="moveSong(${song.id}, 1)"
+                      aria-label="Move ${escapeHtml(song.title)} down in setlist" title="Move down"
+                      ${state.songs.indexOf(song) === state.songs.length - 1 ? "disabled" : ""}
+                      class="h-8 w-8 rounded text-sm font-bold text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↓</button>
+                  </div>
+                </div>
               </td>
 
               <!-- Song & Arrangement -->
               <td class="px-4 py-3.5">
                 <div class="font-bold leading-snug">${escapeHtml(song.title)}</div>
                 <div class="mt-0.5 text-xs text-muted-custom">${escapeHtml(song.subtitle)}</div>
-                <button
-                  type="button"
-                  onclick="openCallSheetForSong(${song.id})"
-                  class="mt-2 inline-flex items-center gap-1 rounded-lg bg-sky-500/10 px-2.5 py-1 text-xs font-semibold text-sky-600 dark:text-sky-400 transition hover:bg-sky-500/20"
-                >
-                  <span>Open Call Sheet →</span>
-                </button>
-                <div class="flex flex-wrap gap-2">
-                  <button type="button" onclick="editSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-muted-custom hover:text-sky-400">Edit</button>
-                  <button id="moveSong-${song.id}--1" type="button" onclick="moveSong(${song.id}, -1)"
-                    aria-label="Move ${escapeHtml(song.title)} up in setlist" title="Move up"
-                    ${state.songs.indexOf(song) === 0 ? "disabled" : ""}
-                    class="min-h-[44px] min-w-[44px] rounded-lg border text-base font-bold surface-subtle hover:border-sky-500 disabled:opacity-30">↑</button>
-                  <button id="moveSong-${song.id}-1" type="button" onclick="moveSong(${song.id}, 1)"
-                    aria-label="Move ${escapeHtml(song.title)} down in setlist" title="Move down"
-                    ${state.songs.indexOf(song) === state.songs.length - 1 ? "disabled" : ""}
-                    class="min-h-[44px] min-w-[44px] rounded-lg border text-base font-bold surface-subtle hover:border-sky-500 disabled:opacity-30">↓</button>
-                </div>
+                <button type="button" onclick="editSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-muted-custom hover:text-sky-400">Edit</button>
               </td>
 
               <!-- Key & Rig -->
