@@ -62,7 +62,11 @@
     </div>
     <!-- VIEW 1: SETLIST & PRACTICE TRACKER -->
     <section id="trackerView" class="space-y-3">
-      <button type="button" onclick="editSong()" class="min-h-[44px] rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white">+ Add song</button>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" onclick="editSong()" class="min-h-[44px] rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white">+ Add song</button>
+        <button id="reorderSongsBtn" type="button" onclick="toggleSongReordering()" aria-pressed="false" disabled
+          class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-semibold text-muted-custom hover:border-sky-500 disabled:opacity-30 surface-subtle">Reorder songs</button>
+      </div>
       <div id="songEditor" class="control-panel hidden w-full">
         <h2 id="songEditorTitle" class="mb-3 text-base font-bold">Add song</h2>
         <form onsubmit="saveSong(event)" class="space-y-3">
@@ -92,8 +96,12 @@
           <button type="button" onclick="cancelDeleteSong()" class="min-h-[44px] rounded-xl border px-3 py-2 text-sm font-bold surface-subtle">Cancel</button>
         </div>
       </div>
+      <div id="songReorderPanel" class="hidden rounded-2xl border p-4 surface-card shadow-sm">
+        <p class="mb-3 text-sm text-muted-custom">Songs are shown in set order, not status order. Drag a handle onto another song or choose a position. Changes save automatically.</p>
+        <div id="songReorderList" class="grid gap-2"></div>
+      </div>
       <!-- Setlist tracker table -->
-      <div class="overflow-hidden rounded-2xl border surface-card shadow-sm">
+      <div id="trackerTablePanel" class="overflow-hidden rounded-2xl border surface-card shadow-sm">
         <div class="table-scroll overflow-x-auto">
           <table class="w-full min-w-[920px] border-collapse text-left">
             <thead>

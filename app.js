@@ -7,6 +7,7 @@
     // =========================================================================
     let state = loadState();
     let activeSort = "order";
+    let reorderingSongs = false;
     let activeTab = "tracker";
     let selectedCallSheetId = state.songs[0]?.id ?? null;
     let fontSizeDrawerOpen = false;
@@ -618,24 +619,29 @@
       document.getElementById("deleteSongPanel").classList.add("hidden");
     }
 
-    function moveSong(id, direction) {
-      const index = state.songs.findIndex((song) => song.id === id);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= state.songs.length) return;
+    function toggleSongReordering() {
+      reorderingSongs = !reorderingSongs;
+      if (reorderingSongs) activeSort = "order";
+      renderTrackerTable();
+      document.getElementById("reorderSongsBtn").focus();
+    }
 
+    function moveSongTo(from, to, restoreFocus = false) {
+      if (from === to || from < 0 || to < 0 || from >= state.songs.length || to >= state.songs.length) return;
       const previousSongs = state.songs;
       state.songs = [...previousSongs];
-      [state.songs[index], state.songs[nextIndex]] = [state.songs[nextIndex], state.songs[index]];
+      const [song] = state.songs.splice(from, 1);
+      state.songs.splice(to, 0, song);
       if (!saveState()) {
         state.songs = previousSongs;
+        renderTrackerTable();
+        if (restoreFocus) document.getElementById(`songPosition-${song.id}`)?.focus();
         return;
       }
-      activeSort = "order";
       renderTrackerTable();
       renderCallSheetView();
-      const focusDirection = nextIndex === 0 ? 1 : nextIndex === state.songs.length - 1 ? -1 : direction;
-      document.getElementById(`moveSong-${id}-${focusDirection}`)?.focus();
-      showToast(`${state.songs[nextIndex].title} moved to #${nextIndex + 1}.`);
+      if (restoreFocus) document.getElementById(`songPosition-${song.id}`)?.focus();
+      showToast(`${song.title} moved to #${to + 1}.`);
     }
 
     function deleteSong() {
@@ -719,6 +725,27 @@
     function renderTrackerTable() {
       renderReadinessSummary();
       updateSortHeaderIndicators();
+      const reorderButton = document.getElementById("reorderSongsBtn");
+      reorderButton.textContent = reorderingSongs ? "Done reordering" : "Reorder songs";
+      reorderButton.setAttribute("aria-pressed", String(reorderingSongs));
+      reorderButton.disabled = state.songs.length < 2 && !reorderingSongs;
+      document.getElementById("songReorderPanel").classList.toggle("hidden", !reorderingSongs);
+      document.getElementById("trackerTablePanel").classList.toggle("hidden", reorderingSongs);
+      document.getElementById("songReorderList").innerHTML = reorderingSongs ? state.songs.map((song, index) => `
+        <div data-reorder-index="${index}" class="flex items-center gap-2 rounded-xl border p-2 surface-subtle">
+          <button type="button" onpointerdown="startReorderDrag(event, ${index}, 'songReorderList', moveSongTo)"
+            aria-label="Drag ${escapeHtml(song.title)} to reorder" title="Drag to reorder"
+            class="section-drag-handle min-h-[44px] min-w-[44px] rounded-lg text-xl text-muted-custom">☰</button>
+          <span class="min-w-0 flex-1 break-words font-semibold">#${index + 1} ${escapeHtml(song.title)}</span>
+          <label class="text-sm text-muted-custom">Position
+            <select id="songPosition-${song.id}" aria-label="Position for ${escapeHtml(song.title)}"
+              onchange="moveSongTo(${index}, Number(this.value), true)"
+              class="min-h-[44px] rounded-lg border px-2 surface-card">
+              ${state.songs.map((_, position) => `<option value="${position}" ${position === index ? "selected" : ""}>${position + 1}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+      `).join("") : "";
       const tbody = document.getElementById("trackerTableBody");
       const rows = getSortedFilteredSongs();
 
@@ -752,19 +779,7 @@
 
               <!-- Setlist order -->
               <td class="order-column sticky z-10 border-r px-2 py-1 text-center surface-card" style="border-color: var(--border-subtle);">
-                <div class="flex items-center justify-center gap-1">
-                  <span class="font-mono-chord text-sm font-extrabold">#${state.songs.indexOf(song) + 1}</span>
-                  <div class="flex flex-col">
-                    <button id="moveSong-${song.id}--1" type="button" onclick="moveSong(${song.id}, -1)"
-                      aria-label="Move ${escapeHtml(song.title)} up in setlist" title="Move up"
-                      ${state.songs.indexOf(song) === 0 ? "disabled" : ""}
-                      class="h-8 w-8 rounded text-sm font-bold text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↑</button>
-                    <button id="moveSong-${song.id}-1" type="button" onclick="moveSong(${song.id}, 1)"
-                      aria-label="Move ${escapeHtml(song.title)} down in setlist" title="Move down"
-                      ${state.songs.indexOf(song) === state.songs.length - 1 ? "disabled" : ""}
-                      class="h-8 w-8 rounded text-sm font-bold text-muted-custom hover:bg-sky-500/20 disabled:opacity-30">↓</button>
-                  </div>
-                </div>
+                <span class="font-mono-chord text-sm font-extrabold">#${state.songs.indexOf(song) + 1}</span>
               </td>
 
               <!-- Song & Arrangement -->
@@ -1118,11 +1133,11 @@
       showToast(`Section moved to #${to + 1}.`);
     }
 
-    function startSectionDrag(event, from) {
+    function startReorderDrag(event, from, listId, onDrop) {
       if (!event.isPrimary || event.button !== 0) return;
       const handle = event.currentTarget;
-      const list = document.getElementById("sectionReorderList");
-      const rows = [...list.querySelectorAll("[data-section-index]")];
+      const list = document.getElementById(listId);
+      const rows = [...list.querySelectorAll("[data-reorder-index]")];
       const source = rows[from];
       let target = null;
       let moved = false;
@@ -1176,7 +1191,7 @@
         if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
         source.classList.remove("section-dragging");
         rows.forEach((row) => row.classList.remove("section-drop-target"));
-        if (endEvent.type === "pointerup" && moved && target !== null) moveCallSheetSection(from, target);
+        if (endEvent.type === "pointerup" && moved && target !== null) onDrop(from, target);
       }
 
       handle.addEventListener("pointermove", onMove);
@@ -1297,8 +1312,8 @@
             <p class="mb-3 text-sm text-muted-custom">Drag a handle onto another section, or use the arrows. Changes save automatically.</p>
             <div id="sectionReorderList" class="grid gap-2">
               ${song.sections.map((sec, index) => `
-                <div data-section-index="${index}" class="section-reorder-row flex items-center gap-2 rounded-xl border p-2 surface-subtle">
-                  <button type="button" onpointerdown="startSectionDrag(event, ${index})"
+                <div data-reorder-index="${index}" class="section-reorder-row flex items-center gap-2 rounded-xl border p-2 surface-subtle">
+                  <button type="button" onpointerdown="startReorderDrag(event, ${index}, 'sectionReorderList', moveCallSheetSection)"
                     aria-label="Drag ${escapeHtml(sec.name || `section ${index + 1}`)} to reorder"
                     title="Drag to reorder" class="section-drag-handle min-h-[44px] min-w-[44px] rounded-lg text-xl text-muted-custom">☰</button>
                   <span class="min-w-0 flex-1 break-words font-semibold">${escapeHtml(sec.name || `Section ${index + 1}`)}</span>
