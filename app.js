@@ -616,6 +616,26 @@
       document.getElementById("deleteSongPanel").classList.add("hidden");
     }
 
+    function moveSong(id, direction) {
+      const index = state.songs.findIndex((song) => song.id === id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= state.songs.length) return;
+
+      const previousSongs = state.songs;
+      state.songs = [...previousSongs];
+      [state.songs[index], state.songs[nextIndex]] = [state.songs[nextIndex], state.songs[index]];
+      if (!saveState()) {
+        state.songs = previousSongs;
+        return;
+      }
+      activeSort = "order";
+      renderTrackerTable();
+      renderCallSheetView();
+      const focusDirection = nextIndex === 0 ? 1 : nextIndex === state.songs.length - 1 ? -1 : direction;
+      document.getElementById(`moveSong-${id}-${focusDirection}`)?.focus();
+      showToast(`${state.songs[nextIndex].title} moved to #${nextIndex + 1}.`);
+    }
+
     function deleteSong() {
       if (deletingSongId === null) return;
       const previousSongs = state.songs;
@@ -731,6 +751,14 @@
                 </button>
                 <div class="flex flex-wrap gap-2">
                   <button type="button" onclick="editSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-muted-custom hover:text-sky-400">Edit</button>
+                  <button id="moveSong-${song.id}--1" type="button" onclick="moveSong(${song.id}, -1)"
+                    aria-label="Move ${escapeHtml(song.title)} up in setlist" title="Move up"
+                    ${state.songs.indexOf(song) === 0 ? "disabled" : ""}
+                    class="min-h-[44px] min-w-[44px] rounded-lg border text-base font-bold surface-subtle hover:border-sky-500 disabled:opacity-30">↑</button>
+                  <button id="moveSong-${song.id}-1" type="button" onclick="moveSong(${song.id}, 1)"
+                    aria-label="Move ${escapeHtml(song.title)} down in setlist" title="Move down"
+                    ${state.songs.indexOf(song) === state.songs.length - 1 ? "disabled" : ""}
+                    class="min-h-[44px] min-w-[44px] rounded-lg border text-base font-bold surface-subtle hover:border-sky-500 disabled:opacity-30">↓</button>
                 </div>
               </td>
 
