@@ -246,6 +246,7 @@
     const headerIcons = {
       setlist: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
       callSheets: '<path d="M9 18V5l12-2v13M9 9l12-2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      edit: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
       fontSize: '<path d="m3 19 6-14 6 14M5 14h8M17 10h6M20 10v9"/>',
       midi: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v7m5-7v7m5-7v7M3 13h18"/>',
       data: '<path d="M4 4h16v16H4zM8 4v5h8V4M8 20v-7h8v7"/>',
@@ -741,6 +742,11 @@
                   class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-sky-400 hover:bg-sky-500/20">
                   ${headerIcon("callSheets")}
                 </button>
+                <button type="button" onclick="editSong(${song.id})"
+                  aria-label="Edit ${escapeHtml(song.title)}" title="Edit song"
+                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted-custom hover:bg-sky-500/20 hover:text-sky-400">
+                  ${headerIcon("edit")}
+                </button>
               </td>
 
               <!-- Setlist order -->
@@ -761,10 +767,9 @@
               </td>
 
               <!-- Song & Arrangement -->
-              <td class="px-4 py-3.5">
+              <td class="song-column px-4 py-3.5">
                 <div class="font-bold leading-snug">${escapeHtml(song.title)}</div>
                 <div class="mt-0.5 text-xs text-muted-custom">${escapeHtml(song.subtitle)}</div>
-                <button type="button" onclick="editSong(${song.id})" class="min-h-[44px] px-2 text-xs font-semibold text-muted-custom hover:text-sky-400">Edit</button>
               </td>
 
               <!-- Key & Rig -->

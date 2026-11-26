@@ -118,6 +118,10 @@
       left: 3.5rem;
     }
 
+    .song-column {
+      min-width: 18rem;
+    }
+
     /* Custom subtle scrollbar for wide tables on mobile */
     .table-scroll::-webkit-scrollbar {
       height: 8px;
