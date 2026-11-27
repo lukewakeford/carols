@@ -13,6 +13,7 @@
     let fontSizeDrawerOpen = false;
     let showPhraseCues = true;
     let songPickerOpen = false;
+    let settingsMenuOpen = false;
     let editingCallSheetSection = null;
     let reorderingCallSheetSongId = null;
     let midiDrawerOpen = false;
@@ -255,6 +256,7 @@
       cues: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
       click: '<path d="M5 21h14L15 3H9L5 21ZM12 14l5-6M9 17h6"/>',
       refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9a7 7 0 0 1 11.6-2L20 12M4 12l2.9 5a7 7 0 0 0 11.6-2"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="m10 2-.5 2.5-2 .8-2.1-1.4-2.5 2.5 1.4 2.1-.8 2L1 11v3l2.5.5.8 2-1.4 2.1 2.5 2.5 2.1-1.4 2 .8L10 23h4l.5-2.5 2-.8 2.1 1.4 2.5-2.5-1.4-2.1.8-2L23 14v-3l-2.5-.5-.8-2 1.4-2.1-2.5-2.5-2.1 1.4-2-.8L14 2z"/>',
       previous: '<path d="m15 18-6-6 6-6"/>',
       next: '<path d="m9 18 6-6-6-6"/>'
     };
@@ -269,7 +271,31 @@
       const cuesText = `Cues: ${showPhraseCues ? "ON" : "OFF"}`;
       const btnBaseClass =
         "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border surface-subtle px-2.5 py-1.5 text-base font-bold transition";
-      const headerRowClass = "flex min-h-[2.25rem] flex-wrap items-center justify-between gap-2";
+      const headerRowClass = isCallSheet
+        ? "flex flex-col gap-2"
+        : "flex min-h-[2.25rem] items-center justify-between gap-2";
+      const menuItemClass = "flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold hover:bg-sky-500/10";
+      const settingsId = isCallSheet ? "callSheetSettings" : "trackerSettings";
+      const settingsMenu = `
+        <div class="relative">
+          <button id="${settingsId}Btn" type="button" onclick="event.stopPropagation(); toggleHeaderSettings()"
+            class="${btnBaseClass} hover:border-sky-500" title="Settings" aria-label="Settings"
+            aria-expanded="${settingsMenuOpen}" aria-controls="${settingsId}Menu">
+            ${headerIcon("settings")}
+          </button>
+          <div id="${settingsId}Menu" class="${settingsMenuOpen ? "" : "hidden "}absolute right-0 top-full z-40 mt-2 max-h-[60vh] w-64 max-w-[90vw] overflow-y-auto rounded-2xl border p-1.5 shadow-xl surface-card">
+            ${isCallSheet ? `
+              <button type="button" onclick="runHeaderSetting('songMidi')" class="${menuItemClass}" aria-expanded="${midiDrawerOpen}">${headerIcon("midi")} Song MIDI</button>
+              <button type="button" onclick="runHeaderSetting('fontSize')" class="${menuItemClass}" aria-expanded="${fontSizeDrawerOpen}">${headerIcon("fontSize")} Text size</button>
+              <button type="button" onclick="runHeaderSetting('cues')" class="${menuItemClass}" aria-pressed="${showPhraseCues}">${headerIcon("cues")} ${escapeHtml(cuesText)}</button>
+            ` : `
+              <button type="button" onclick="runHeaderSetting('data')" class="${menuItemClass}" aria-expanded="${!document.getElementById("dataPanel").classList.contains("hidden")}">${headerIcon("data")} Backup and restore</button>
+              <button type="button" onclick="runHeaderSetting('midiSetup')" class="${menuItemClass}" aria-expanded="${!document.getElementById("midiSetup").classList.contains("hidden")}">${headerIcon("midi")} MIDI device setup</button>
+            `}
+            <button type="button" onclick="runHeaderSetting('click')" class="${menuItemClass}" aria-expanded="${!document.getElementById("metronomeDrawer").classList.contains("hidden")}">${headerIcon("click")} Metronome</button>
+            ${isCallSheet ? "" : `<button type="button" onclick="window.location.reload()" class="${menuItemClass}">${headerIcon("refresh")} Refresh app</button>`}
+          </div>
+        </div>`;
 
       const leftHtml = isCallSheet
         ? `
@@ -311,56 +337,14 @@
 
       const rightHtml = isCallSheet
         ? `
-          <div class="relative flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
-            <button
-              type="button"
-              onclick="midiDrawerOpen = !midiDrawerOpen; renderCallSheetView()"
-              class="${btnBaseClass} hover:border-sky-500"
-              title="MIDI settings"
-              aria-label="MIDI settings"
-              aria-expanded="${midiDrawerOpen}"
-              aria-controls="midiDrawer"
-            >${headerIcon("midi")}</button>
-            <button
-              id="toggleFontSizeBtn"
-              type="button"
-              onclick="fontSizeDrawerOpen = !fontSizeDrawerOpen; renderCallSheetView()"
-              class="${btnBaseClass} hover:border-sky-500"
-              title="Text size"
-              aria-label="Call-sheet text size"
-              aria-expanded="${fontSizeDrawerOpen}"
-              aria-controls="fontSizeDrawer"
-            >
-              ${headerIcon("fontSize")}
-            </button>
-            <button
-              id="togglePhraseCuesBtn"
-              type="button"
-              onclick="togglePhraseCuesHandler()"
-              class="${btnBaseClass} hover:border-sky-500 ${showPhraseCues ? "text-sky-400" : "text-muted-custom"}"
-              title="${escapeHtml(cuesText)}"
-              aria-label="Phrase cues"
-              aria-pressed="${showPhraseCues}"
-            >
-              ${headerIcon("cues")}
-            </button>
-            <button
-              id="callSheetClickBtn"
-              type="button"
-              onclick="toggleMetronomeDrawer()"
-              class="${btnBaseClass} hover:border-sky-500"
-              title="Click"
-              aria-label="Toggle metronome"
-            >
-              ${headerIcon("click")}
-            </button>
+          <div class="relative flex w-full items-center gap-2">
             <button
               id="songPickerBtn"
               type="button"
               aria-haspopup="listbox"
               aria-expanded="${songPickerOpen}"
               aria-controls="songPickerMenu"
-              onclick="event.stopPropagation(); songPickerOpen = !songPickerOpen; renderCallSheetView();"
+              onclick="event.stopPropagation(); toggleSongPicker()"
               class="${btnBaseClass} gap-1 hover:border-sky-500"
               title="Choose song from setlist"
             >
@@ -371,7 +355,7 @@
               id="prevSongBtn"
               type="button"
               onclick="stepCallSheetSong(-1)"
-              class="${btnBaseClass} hover:border-sky-500"
+              class="${btnBaseClass} call-sheet-nav-button hover:border-sky-500"
               title="Previous song"
               aria-label="Previous song"
             >
@@ -381,12 +365,13 @@
               id="nextSongBtn"
               type="button"
               onclick="stepCallSheetSong(1)"
-              class="${btnBaseClass} hover:border-sky-500"
+              class="${btnBaseClass} call-sheet-nav-button hover:border-sky-500"
               title="Next song"
               aria-label="Next song"
             >
               ${headerIcon("next")}
             </button>
+            ${settingsMenu}
 
             <div
               id="songPickerMenu"
@@ -425,34 +410,7 @@
           </div>
         `
         : `
-          <div class="flex shrink-0 items-center gap-1.5">
-            <button type="button" onclick="toggleDataPanel()" class="${btnBaseClass} hover:border-sky-500" title="Backup and restore" aria-label="Backup and restore" aria-controls="dataPanel" aria-expanded="${!document.getElementById("dataPanel").classList.contains("hidden")}">
-              ${headerIcon("data")}
-            </button>
-            <button type="button" onclick="toggleMidiSetup()" class="${btnBaseClass} hover:border-sky-500" title="MIDI device setup" aria-label="MIDI device setup" aria-controls="midiSetup" aria-expanded="${!document.getElementById("midiSetup").classList.contains("hidden")}">
-              ${headerIcon("midi")}
-            </button>
-            <button
-              id="toggleMetronomeBtn"
-              type="button"
-              onclick="toggleMetronomeDrawer()"
-              class="${btnBaseClass} hover:border-sky-500"
-              title="Click"
-              aria-label="Toggle metronome"
-            >
-              ${headerIcon("click")}
-            </button>
-            <button
-              id="refreshBtn"
-              type="button"
-              onclick="window.location.reload()"
-              class="${btnBaseClass} hover:border-sky-500"
-              title="Refresh app"
-              aria-label="Refresh app"
-            >
-              ${headerIcon("refresh")}
-            </button>
-          </div>
+          ${settingsMenu}
         `;
 
       return `
@@ -469,6 +427,51 @@
         slot.innerHTML = buildSharedHeaderBar("tracker");
       }
       document.getElementById("midiChannel").value = state.midiChannel || 1;
+    }
+
+    function renderActiveHeader() {
+      if (activeTab === "callSheets") {
+        const song = state.songs.find((item) => item.id === selectedCallSheetId);
+        if (song) document.getElementById("callSheetHeaderSlot").innerHTML = buildSharedHeaderBar("callSheets", song);
+      } else {
+        renderTrackerHeader();
+      }
+    }
+
+    function toggleHeaderSettings() {
+      settingsMenuOpen = !settingsMenuOpen;
+      songPickerOpen = false;
+      renderActiveHeader();
+      document.getElementById(activeTab === "callSheets" ? "callSheetSettingsBtn" : "trackerSettingsBtn").focus();
+    }
+
+    function toggleSongPicker() {
+      songPickerOpen = !songPickerOpen;
+      settingsMenuOpen = false;
+      renderActiveHeader();
+      document.getElementById("songPickerBtn").focus();
+    }
+
+    function runHeaderSetting(setting) {
+      settingsMenuOpen = false;
+      if (setting === "songMidi") midiDrawerOpen = !midiDrawerOpen;
+      else if (setting === "fontSize") fontSizeDrawerOpen = !fontSizeDrawerOpen;
+      else if (setting === "cues") showPhraseCues = !showPhraseCues;
+      else if (setting === "data") toggleDataPanel();
+      else if (setting === "midiSetup") toggleMidiSetup();
+      else if (setting === "click") toggleMetronomeDrawer();
+
+      if (activeTab === "callSheets") {
+        if (setting === "cues") renderCallSheetView();
+        else {
+          document.getElementById("midiDrawer").classList.toggle("hidden", !midiDrawerOpen);
+          document.getElementById("fontSizeDrawer").classList.toggle("hidden", !fontSizeDrawerOpen);
+          renderActiveHeader();
+        }
+      } else {
+        renderActiveHeader();
+      }
+      document.getElementById(activeTab === "callSheets" ? "callSheetSettingsBtn" : "trackerSettingsBtn").focus();
     }
 
     function escapeHtml(value) {
@@ -1477,6 +1480,8 @@
         showToast("Add a song before opening call sheets.");
         return;
       }
+      settingsMenuOpen = false;
+      songPickerOpen = false;
       activeTab = tabName;
       document.getElementById(tabName === "callSheets" ? "callSheetControls" : "trackerControls")
         .appendChild(document.getElementById("metronomeDrawer"));
@@ -1515,6 +1520,7 @@
 
     function stepCallSheetSong(delta) {
       songPickerOpen = false;
+      settingsMenuOpen = false;
       const songs = state.songs;
       if (!Array.isArray(songs) || songs.length === 0) return;
 
@@ -1527,19 +1533,30 @@
       sendCurrentSongMidi();
     }
 
-    function togglePhraseCuesHandler() {
-      showPhraseCues = !showPhraseCues;
-      renderCallSheetView();
-    }
-
     document.addEventListener("click", (e) => {
-      if (!songPickerOpen) return;
-      const menu = document.getElementById("songPickerMenu");
-      const btn = document.getElementById("songPickerBtn");
-      if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+      if (!e.target.isConnected) return;
+      const activeHeader = document.getElementById(activeTab === "callSheets" ? "callSheetHeaderSlot" : "trackerHeaderSlot");
+      const settingsId = activeTab === "callSheets" ? "callSheetSettings" : "trackerSettings";
+      if (settingsMenuOpen && !activeHeader.querySelector(`#${settingsId}Menu`)?.contains(e.target) &&
+          !activeHeader.querySelector(`#${settingsId}Btn`)?.contains(e.target)) {
+        settingsMenuOpen = false;
+        renderActiveHeader();
+      } else if (songPickerOpen && !activeHeader.querySelector("#songPickerMenu")?.contains(e.target) &&
+          !activeHeader.querySelector("#songPickerBtn")?.contains(e.target)) {
         songPickerOpen = false;
-        renderCallSheetView();
+        renderActiveHeader();
       }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || (!settingsMenuOpen && !songPickerOpen)) return;
+      const buttonId = settingsMenuOpen
+        ? (activeTab === "callSheets" ? "callSheetSettingsBtn" : "trackerSettingsBtn")
+        : "songPickerBtn";
+      settingsMenuOpen = false;
+      songPickerOpen = false;
+      renderActiveHeader();
+      document.getElementById(buttonId)?.focus();
     });
 
     function syncHeaderVisibilityForTab(tabName) {
