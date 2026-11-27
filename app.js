@@ -271,9 +271,6 @@
       const cuesText = `Cues: ${showPhraseCues ? "ON" : "OFF"}`;
       const btnBaseClass =
         "inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border surface-subtle px-2.5 py-1.5 text-base font-bold transition";
-      const headerRowClass = isCallSheet
-        ? "flex flex-col gap-2"
-        : "flex min-h-[2.25rem] items-center justify-between gap-2";
       const menuItemClass = "flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold hover:bg-sky-500/10";
       const settingsId = isCallSheet ? "callSheetSettings" : "trackerSettings";
       const settingsMenu = `
@@ -297,45 +294,36 @@
           </div>
         </div>`;
 
-      const leftHtml = isCallSheet
+      const titleHtml = isCallSheet
+        ? `<h2 id="callSheetSongTitle" class="min-w-0 truncate text-center text-base font-extrabold tracking-tight sm:text-lg">${escapeHtml(safeSong.title)}</h2>`
+        : `<h1 class="min-w-0 truncate text-center text-base font-extrabold tracking-tight sm:text-lg">Setlist</h1>`;
+      const viewButton = isCallSheet
         ? `
-          <div class="flex min-w-0 flex-1 items-center gap-2">
-            <button
-              id="callSheetBackToSetlistBtn"
-              type="button"
-              onclick="songPickerOpen = false; switchTab('tracker');"
-              class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
-              title="Back to Setlist"
-              aria-label="Back to setlist"
-            >
-              ${headerIcon("setlist")}
-            </button>
-
-            <h2
-              id="callSheetSongTitle"
-              class="min-w-0 flex-1 truncate text-base font-extrabold tracking-tight sm:text-lg"
-            >
-              ${escapeHtml(safeSong.title)}
-            </h2>
-          </div>
+          <button
+            id="callSheetBackToSetlistBtn"
+            type="button"
+            onclick="songPickerOpen = false; switchTab('tracker');"
+            class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
+            title="Back to Setlist"
+            aria-label="Back to setlist"
+          >
+            ${headerIcon("setlist")}
+          </button>
         `
         : `
-          <div class="flex min-w-0 flex-1 items-center gap-2">
-            <button
-              id="tabCallSheetsBtn"
-              type="button"
-              onclick="switchTab('callSheets');"
-              class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
-              title="Open Call Sheets"
-              aria-label="Open call sheets"
-            >
-              ${headerIcon("callSheets")}
-            </button>
-            <h1 class="min-w-0 flex-1 truncate text-base font-extrabold tracking-tight sm:text-lg">Setlist</h1>
-          </div>
+          <button
+            id="tabCallSheetsBtn"
+            type="button"
+            onclick="switchTab('callSheets');"
+            class="${btnBaseClass} shrink-0 text-muted-custom hover:border-sky-500 hover:text-current"
+            title="Open Call Sheets"
+            aria-label="Open call sheets"
+          >
+            ${headerIcon("callSheets")}
+          </button>
         `;
 
-      const rightHtml = isCallSheet
+      const navigationHtml = isCallSheet
         ? `
           <div class="relative flex w-full items-center gap-2">
             <button
@@ -345,7 +333,7 @@
               aria-expanded="${songPickerOpen}"
               aria-controls="songPickerMenu"
               onclick="event.stopPropagation(); toggleSongPicker()"
-              class="${btnBaseClass} gap-1 hover:border-sky-500"
+              class="${btnBaseClass} song-picker-button gap-1 hover:border-sky-500"
               title="Choose song from setlist"
             >
               <span id="songPickerIndex" class="font-mono-chord text-sky-600 dark:text-sky-400">#${state.songs.indexOf(safeSong) + 1}</span>
@@ -371,13 +359,11 @@
             >
               ${headerIcon("next")}
             </button>
-            ${settingsMenu}
-
             <div
               id="songPickerMenu"
               role="listbox"
               aria-label="Select song"
-              class="${songPickerOpen ? "" : "hidden "}absolute right-0 top-full z-40 mt-2 max-h-80 w-72 max-w-[90vw] overflow-y-auto rounded-2xl border p-1.5 shadow-xl surface-card"
+              class="${songPickerOpen ? "" : "hidden "}absolute left-0 top-full z-40 mt-2 max-h-80 w-72 max-w-[90vw] overflow-y-auto rounded-2xl border p-1.5 shadow-xl surface-card"
             >
               ${state.songs
                 .map((s) => {
@@ -409,14 +395,19 @@
             </div>
           </div>
         `
-        : `
-          ${settingsMenu}
-        `;
+        : "";
 
       return `
-        <div class="${headerRowClass}">
-          ${leftHtml}
-          ${rightHtml}
+        <div class="flex flex-col gap-2">
+          <div class="header-title-row">
+            <div aria-hidden="true"></div>
+            ${titleHtml}
+            <div class="flex items-center justify-end gap-2">
+              ${settingsMenu}
+              ${viewButton}
+            </div>
+          </div>
+          ${navigationHtml}
         </div>
       `;
     }
